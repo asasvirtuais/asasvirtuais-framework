@@ -1,0 +1,20 @@
+{
+  "name": "asasvirtuais",
+  "version": "1.0.0",
+  "directories": {
+    "packages": "./packages"
+  },
+  "files": [
+    "packages",
+    "tsconfig.json"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    "./action": "./packages/action.tsx",
+    "./fields": "./packages/fields.tsx",
+    "./form": "./packages/form.tsx"
+  },
+  "dependencies": {
+    "react": "^19.2.0"
+  }
+}
