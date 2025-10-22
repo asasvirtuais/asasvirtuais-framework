@@ -1,7 +1,8 @@
 {
   "name": "asasvirtuais",
   "type": "module",
-  "version": "1.0.1",
+  "version": "1.0.2",
+  "description": "React form and action management utilities",
   "directories": {
     "packages": "./packages"
   },
@@ -11,9 +12,21 @@
   ],
   "exports": {
     "./package.json": "./package.json",
-    "./action": "./packages/action.tsx",
-    "./fields": "./packages/fields.tsx",
-    "./form": "./packages/form.tsx"
+    "./action": {
+      "types": "./packages/action.tsx",
+      "default": "./packages/action.tsx"
+    },
+    "./fields": {
+      "types": "./packages/fields.tsx",
+      "default": "./packages/fields.tsx"
+    },
+    "./form": {
+      "types": "./packages/form.tsx",
+      "default": "./packages/form.tsx"
+    }
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
   },
   "dependencies": {
     "react": "^19.2.0"
