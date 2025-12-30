@@ -11,9 +11,9 @@ npm install asasvirtuais
 
 ### From esm.sh
 ```typescript
-import { Form } from 'https://esm.sh/asasvirtuais@1.0.1/form'
-import { useFields } from 'https://esm.sh/asasvirtuais@1.0.1/fields'
-import { useAction } from 'https://esm.sh/asasvirtuais@1.0.1/action'
+import { Form } from 'https://esm.sh/asasvirtuais@latest/form'
+import { useFields } from 'https://esm.sh/asasvirtuais@latest/fields'
+import { useAction } from 'https://esm.sh/asasvirtuais@latest/action'
 ```
 
 ## Basic Usage
