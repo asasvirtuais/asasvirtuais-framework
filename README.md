@@ -127,6 +127,238 @@ function DeleteButton({ userId }: { userId: string }) {
 }
 ```
 
+## `react-interface` for Data-Driven Applications
+
+The `react-interface` package provides a powerful, high-level abstraction for building data-driven React applications. It's designed to work with a standardized `TableInterface` to provide a consistent, type-safe, and efficient way to interact with your data backend. It gives you React hooks and components that are automatically wired up to your API, handling data fetching, caching, and state management for you.
+
+### Todo App Example
+
+Let's walk through building a simple Todo app to demonstrate how to use `react-interface`.
+
+#### 1. Define Your Schema
+
+First, define the schema for your `todos` table using `zod`. This is the single source of truth for your data shapes.
+
+```typescript
+// app/database.ts
+import { z } from 'zod';
+
+export const schema = {
+  todos: {
+    readable: z.object({
+      id: z.string(),
+      text: z.string(),
+      completed: z.boolean(),
+      createdAt: z.date(),
+    }),
+    writable: z.object({
+      text: z.string(),
+      completed: z.boolean().optional(),
+    }),
+  },
+};
+```
+
+#### 2. Initialize the React Interface
+
+Create an `interface.ts` file in your `app` directory to initialize the `reactInterface` and export the hooks and components.
+
+```typescript
+// app/interface.ts
+import { reactInterface } from '@asasvirtuais/interface';
+import { schema } from './database';
+
+// This would typically be a fetch or other data source implementation
+const yourDataInterface = {
+  find: async (props) => { /* ... */ },
+  create: async (props) => { /* ... */ },
+  update: async (props) => { /* ... */ },
+  remove: async (props) => { /* ... */ },
+  list: async (props) => { /* ... */ },
+};
+
+export const {
+  DatabaseProvider,
+  useTable,
+  CreateForm,
+  UpdateForm,
+  FilterForm, // Or ListForm
+  SingleProvider,
+  useSingle,
+} = reactInterface<typeof schema>(schema, yourDataInterface);
+```
+
+#### 3. Provide the Data Context
+
+Wrap your application (or the relevant part of it) with the `DatabaseProvider` to make the data available to all child components.
+
+```tsx
+// app/layout.tsx
+import { DatabaseProvider } from '@/app/interface';
+import { fetchTodos } from '@/app/api'; // Example API call
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const initialTodos = await fetchTodos(); // Fetch initial data on the server
+  return (
+    <html lang="en">
+      <body>
+        <DatabaseProvider todos={initialTodos}>
+          {children}
+        </DatabaseProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+#### 4. Listing Todos and Using `useTable`
+
+The `useTable` hook is the primary way to interact with your table's data. It gives you access to the data index (a key-value store of your items) and the CRUD methods.
+
+```tsx
+// app/todos/page.tsx
+'use client';
+
+import { useTable } from '@/app/interface';
+
+function TodoList() {
+  const { array: todos, remove, update } = useTable('todos');
+
+  return (
+    <ul>
+      {todos.map(todo => (
+        <li key={todo.id}>
+          <span
+            style={{ textDecoration: todo.completed ? 'line-through' : 'none' }}
+            onClick={() => update.trigger({ id: todo.id, data: { completed: !todo.completed } })}
+          >
+            {todo.text}
+          </span>
+          <button onClick={() => remove.trigger({ id: todo.id })}>Delete</button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+#### 5. Creating Todos with `CreateForm`
+
+The `CreateForm` component provides a ready-to-use form for creating new items. It handles form state, submission, and updates the local data index on success.
+
+```tsx
+// app/todos/page.tsx (continued)
+import { CreateForm, useTable } from '@/app/interface';
+import { z } from 'zod';
+import { schema } from '@/app/database';
+
+function AddTodoForm() {
+  return (
+    <CreateForm<typeof schema, 'todos'>
+      table="todos"
+      defaults={{ text: '' }}
+      onSuccess={(newTodo) => {
+        console.log('Successfully created:', newTodo.text);
+      }}
+    >
+      {({ fields, setField, submit, loading }) => (
+        <form onSubmit={submit}>
+          <input
+            value={fields.text}
+            onChange={(e) => setField('text', e.target.value)}
+            placeholder="What needs to be done?"
+          />
+          <button type="submit" disabled={loading}>
+            {loading ? 'Adding...' : 'Add Todo'}
+          </button>
+        </form>
+      )}
+    </CreateForm>
+  );
+}
+```
+
+#### 6. Updating Todos with `UpdateForm`
+
+Similarly, `UpdateForm` is used for editing existing items. It's often used in combination with `SingleProvider` and `useSingle` to work with a specific item.
+
+```tsx
+// app/todos/[id]/edit/page.tsx
+'use client';
+
+import { UpdateForm, useSingle } from '@/app/interface';
+import { z } from 'zod';
+import { schema } from '@/app/database';
+
+function EditTodoForm() {
+  const { single: todo } = useSingle('todos');
+
+  if (!todo) return <div>Loading...</div>;
+
+  return (
+    <UpdateForm<typeof schema, 'todos'>
+      table="todos"
+      id={todo.id}
+      defaults={{ text: todo.text }}
+      onSuccess={() => {
+        // Redirect or show a success message
+      }}
+    >
+      {({ fields, setField, submit, loading }) => (
+        <form onSubmit={submit}>
+          <input
+            value={fields.text}
+            onChange={(e) => setField('text', e.target.value)}
+          />
+          <button type="submit" disabled={loading}>
+            {loading ? 'Saving...' : 'Save Changes'}
+          </button>
+        </form>
+      )}
+    </UpdateForm>
+  );
+}
+```
+
+#### 7. Filtering Todos with `FilterForm` (ListForm)
+
+`FilterForm` allows you to build UIs for filtering and searching your data. It works just like other forms, but its action triggers the `list` method of your `TableInterface`.
+
+```tsx
+// app/todos/page.tsx (continued)
+import { FilterForm, useTable } from '@/app/interface';
+import { z } from 'zod';
+import { schema } from '@/app/database';
+
+function TodoFilter() {
+  const { list } = useTable('todos');
+
+  return (
+    <FilterForm<typeof schema, 'todos'>
+      table="todos"
+      defaults={{ query: { completed: false } }}
+      onSuccess={(results) => {
+        console.log(`Found ${results.length} matching todos.`);
+      }}
+    >
+      {({ fields, setField, submit }) => (
+        <div>
+          <label>
+            <input
+              type="checkbox"
+              checked={fields.query.completed}
+              onChange={(e) => setField('query.completed', e.target.checked)}
+            />
+            Show completed
+          </label>
+          <button onClick={submit}>Apply Filter</button>
+        </div>
+      )}
+    </FilterForm>
+  );
+}
+```
+
 ## Advanced Usage
 
 ### Nested Forms: Multi-Step Async Validation
