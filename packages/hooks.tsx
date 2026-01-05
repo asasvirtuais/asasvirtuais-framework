@@ -118,4 +118,3 @@ export function createContextFromHook<Props, Result>(useHook: (props: Props) => 
 
     return [Provider, useContext] as const
 }
-

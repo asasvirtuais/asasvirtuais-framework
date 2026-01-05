@@ -65,7 +65,6 @@ export async function handleRoute<P, R>(
   }
 }
 // Utility for creating a single dynamic route handler
-
 export function createDynamicRoute(implementation: TableInterface<any, any>) {
   const routeHandlers = routes(implementation)
 
