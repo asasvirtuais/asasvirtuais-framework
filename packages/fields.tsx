@@ -1,4 +1,3 @@
-'use client'
 import React, { createContext, useCallback, useState } from 'react'
 
 export type FieldsProps<T> = { defaults?: Partial<T> }
