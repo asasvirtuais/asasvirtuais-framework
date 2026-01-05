@@ -1,7 +1,7 @@
 {
   "name": "asasvirtuais",
   "type": "module",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "React form and action management utilities",
   "directories": {
     "packages": "./packages"
@@ -23,12 +23,32 @@
     "./form": {
       "types": "./packages/form.tsx",
       "default": "./packages/form.tsx"
+    },
+    "./hooks": {
+      "types": "./packages/hooks.tsx",
+      "default": "./packages/hooks.tsx"
+    },
+    "./interface": {
+      "types": "./packages/interface/interface.ts",
+      "default": "./packages/interface/interface.ts"
+    },
+    "./react-interface": {
+      "types": "./packages/react-interface.tsx",
+      "default": "./packages/react-interface.tsx"
+    },
+    "./next-interface": {
+      "types": "./packages/next-interface.tsx",
+      "default": "./packages/next-interface.tsx"
     }
   },
   "peerDependencies": {
-    "react": ">=18.0.0"
+    "react": "^19.2.3"
   },
   "dependencies": {
-    "react": "^19.2.0"
+    "next": "^16.1.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7"
   }
 }

@@ -11,7 +11,7 @@ import {
 import { useAction as useAsyncAction, useIndex } from './hooks'
 import { ActionProvider, useAction, useActionProvider } from './action'
 import { TableInterface, ListProps, DatabaseInterface } from './interface'
-import { FieldsProvider, useFields, useFieldsProvider } from '@asasvirtuais/fields'
+import { FieldsProvider, useFields } from './fields'
 
 export function reactInterface<
   Database extends DatabaseInterface>(
@@ -257,7 +257,7 @@ export function reactInterface<
     defaults?: Partial<z.infer<Database[T]['writable']>>
     onSuccess?: (result: z.infer<Database[T]['readable']>) => void
     children: React.ReactNode | (
-      (props: ReturnType<typeof useActionProvider<z.infer<Partial<Database[T]['writable']>>, z.infer<Database[T]['readable']>>>
+      (props: ReturnType<typeof useActionProvider<Partial<z.infer<Database[T]['writable']>>, z.infer<Database[T]['readable']>>>
         & ReturnType<typeof useFields<z.infer<Database[T]['writable']>>>
       ) => React.ReactNode
     )
@@ -379,5 +379,17 @@ export function reactInterface<
     useCreateForm,
     useUpdateForm,
     useFiltersForm,
+  }
+}
+
+export class ReactInterface<Database extends DatabaseInterface> {
+  constructor(
+    database: Database,
+    tableInterface: TableInterface<
+        z.infer<Database[keyof Database]['readable']>,
+        z.infer<Database[keyof Database]['writable']>
+    >
+  ) {
+    return reactInterface(database, tableInterface)
   }
 }
