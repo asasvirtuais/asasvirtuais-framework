@@ -25,7 +25,7 @@ The core insight: **developers and AI shouldn't need to think about state manage
 
 ### What Makes This Different
 
-1. **Nested forms that actually make sense** - Build multi-step async validation workflows without reinventing the wheel
+1. **Nested forms that actually make sense** - Build multi-step async validation workflows without the pain
 2. **CRUD operations as a solved problem** - Filter, create, update with zero boilerplate
 3. **Code in one place** - Business logic lives in readable, single files, not scattered across a dependency tree
 4. **AI-friendly patterns** - Simple enough that AI can generate complex forms correctly on the first try
@@ -360,6 +360,136 @@ function TodoList() {
   )}
 </Form>
 ```
+
+## Effects and Side Effects
+
+One of asasvirtuais's core strengths is making effects simple. No middleware arrays, no lifecycle hooks—just write code where it belongs.
+
+### Frontend Effects (React)
+
+In React, you control exactly when effects happen by writing code around form actions.
+
+#### Pre-flight Effects
+
+Run code before submission:
+
+```tsx
+<CreateForm<typeof schema, 'messages'>
+  table="messages"
+  defaults={{ content: '' }}
+>
+  {({ fields, setField, submit, loading }) => (
+    <form onSubmit={submit}>
+      <textarea
+        value={fields.content}
+        onChange={(e) => setField('content', e.target.value)}
+      />
+      <button
+        onClick={() => {
+          // Pre-flight effect - runs before submit
+          trackEvent('message_submit_clicked')
+          validateContent(fields.content)
+          submit()
+        }}
+        disabled={loading}
+      >
+        Send
+      </button>
+    </form>
+  )}
+</CreateForm>
+```
+
+#### Post-flight Effects
+
+Run code after successful submission:
+
+```tsx
+<CreateForm<typeof schema, 'messages'>
+  table="messages"
+  defaults={{ content: '' }}
+  onSuccess={(message) => {
+    // Post-flight effects - run after success
+    notifyUser('Message sent!')
+    scrollToBottom()
+    trackAnalytics('message_created', { id: message.id })
+  }}
+>
+  {({ fields, setField, submit }) => (
+    <form onSubmit={submit}>
+      {/* form fields */}
+    </form>
+  )}
+</CreateForm>
+```
+
+### Backend Effects (API Routes)
+
+On the backend, effects are just functions wrapping other functions. No framework magic.
+
+#### Using tableInterface for Business Logic
+
+```typescript
+// app/api/v1/[...params]/route.ts
+import { tableInterface } from '@asasvirtuais/interface'
+import { firestoreInterface } from '@/lib/firestore'
+import { schema } from '@/app/database'
+
+// Wrap your base interface with business logic
+const messagesInterface = tableInterface(schema, 'messages', {
+  async create(props) {
+    // Pre-flight validation
+    await checkUserQuota(props.data.userId)
+    await moderateContent(props.data.content)
+    
+    // The actual database operation
+    const message = await firestoreInterface.create(props)
+    
+    // Post-flight side effects
+    await updateConversationTimestamp(message.conversationId)
+    await notifyParticipants(message.conversationId, message.id)
+    await trackMessageCreated(message)
+    
+    return message
+  },
+  
+  async update(props) {
+    const existing = await firestoreInterface.find(props)
+    
+    // Business rule enforcement
+    if (existing.role === 'assistant') {
+      throw new Error("Cannot edit assistant messages")
+    }
+    
+    if (existing.userId !== getCurrentUserId()) {
+      throw new Error("Cannot edit other users' messages")
+    }
+    
+    return firestoreInterface.update(props)
+  },
+  
+  async remove(props) {
+    const message = await firestoreInterface.find(props)
+    
+    // Cascade deletion
+    await deleteMessageAttachments(message.id)
+    await updateConversationCount(message.conversationId, -1)
+    
+    return firestoreInterface.remove(props)
+  },
+  
+  // Pass through operations that don't need custom logic
+  find: firestoreInterface.find,
+  list: firestoreInterface.list,
+})
+```
+
+### Key Principles
+
+1. **Effects are just code** - No special lifecycle methods or middleware patterns
+2. **Control flow is visible** - Reading the code tells you exactly what runs and when
+3. **Composition over configuration** - Wrap functions to add behavior, don't configure hooks
+4. **Backend and frontend mirror each other** - The same compositional patterns work everywhere
 
 ## API Reference
 
