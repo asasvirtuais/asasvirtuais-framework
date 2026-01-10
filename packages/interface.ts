@@ -8,12 +8,14 @@ export interface TableInterface<Readable, Writable = Readable> {
   list   (props: ListProps<Readable>)   : Promise<Readable[]>
 }
 
-export function tableInterface<Schema extends DatabaseInterface, Table extends keyof Schema & string>(schema: Schema, table?: Table | null, tableInterface?: TableInterface<z.infer<Schema[Table]['readable']>, z.infer<Schema[Table]['writable']>>) {
+export function tableInterface<Schema extends DatabaseSchema, Table extends keyof Schema & string>(schema: Schema, table?: Table | null, tableInterface?: TableInterface<z.infer<Schema[Table]['readable']>, z.infer<Schema[Table]['writable']>>) {
   return tableInterface
 }
 
-export interface DatabaseInterface {
-  [T: string]: { readable: z.ZodObject<z.ZodRawShape>, writable: z.ZodObject<z.ZodRawShape> }
+export interface TableSchema { readable: z.ZodObject<z.ZodRawShape>, writable: z.ZodObject<z.ZodRawShape> }
+
+export interface DatabaseSchema {
+  [T: string]: TableSchema
 }
 
 export type BasicOperators<T, K extends keyof T> = {

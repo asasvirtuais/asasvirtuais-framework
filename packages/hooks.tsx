@@ -80,7 +80,7 @@ export function useIndex<T>(value: Record<string, any>) {
         }))
     }, [])
 
-    const remove = useCallback((...params: readable[]) => {
+    const unset = useCallback((...params: readable[]) => {
         setIndex(prev => {
             const newState = { ...prev }
             for (const data of params) {
@@ -97,7 +97,7 @@ export function useIndex<T>(value: Record<string, any>) {
         array,
         set,
         setIndex,
-        remove,
+        unset,
     }
 }
 

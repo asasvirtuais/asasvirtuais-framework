@@ -7,13 +7,14 @@ import {
   createContext,
   useContext,
 } from 'react'
+
 import { useAction as useAsyncAction, useIndex } from './hooks'
 import { ActionProvider, useAction, useActionProvider } from './action'
-import { TableInterface, ListProps, DatabaseInterface } from './interface'
+import { TableInterface, ListProps, DatabaseSchema } from './interface'
 import { FieldsProvider, useFields } from './fields'
 
 export function reactInterface<
-  Database extends DatabaseInterface>(
+  Database extends DatabaseSchema>(
   database: Database,
   {
     find,
@@ -72,7 +73,7 @@ export function reactInterface<
         return res
       })) as typeof update),
       remove: useAsyncAction(((props) => remove({ ...props, table }).then(res => {
-        index.remove(res)
+        index.unset(res)
         return res
       })) as typeof remove),
       list: useAsyncAction(((props) => list({ ...props, table }).then(arr => {
@@ -80,18 +81,6 @@ export function reactInterface<
         return arr
       })) as typeof list),
     }
-  }
-
-  function useDatabaseProvider(tables: { [T in TableKey]: Record<string, z.infer<Database[T]['readable']>> }): {
-    [T in TableKey]: ReturnType<typeof useTableProvider<T>>
-  } {
-    return Object.fromEntries(
-      Object.entries(tables).map(([table, value]) => [
-        table, useTableProvider({ table: table as TableKey, asAbove: value })
-      ])
-    ) as {
-        [T in TableKey]: ReturnType<typeof useTableProvider<T>>
-      }
   }
   // Create a separate context for each table dynamically
   const tableContexts = new Map<TableKey, React.Context<ReturnType<typeof useTableProvider<any>> | undefined>>();
@@ -381,7 +370,7 @@ export function reactInterface<
   }
 }
 
-export class ReactInterface<Database extends DatabaseInterface> {
+export class ReactInterface<Database extends DatabaseSchema> {
   constructor(
     database: Database,
     tableInterface: TableInterface<
