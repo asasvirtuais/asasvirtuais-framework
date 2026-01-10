@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useState } from 'react'
+import React, { createContext, useCallback, useMemo, useState } from 'react'
 
 export type FieldsProps<T> = { defaults?: Partial<T> }
 
@@ -47,10 +47,19 @@ export const useFields = <T,>() => {
 }
 
 export const useField = <T,>(fieldName: keyof T) => {
-    const { fields, setField } = useFields<T>()
- 
+    const { fields } = useFields<T>()
+
+    const value = useMemo(() => fields[fieldName], [fields, fieldName])
+    const setValue = useCallback(
+        (newValue: T[keyof T]) => {
+            const { setField } = useFields<T>()
+            setField(fieldName, newValue)
+        },
+        [fieldName]
+    )
+
     return {
-        value: fields[fieldName],
-        setValue: setField
+        value,
+        setValue
     }
 }
