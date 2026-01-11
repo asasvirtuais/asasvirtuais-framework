@@ -1,8 +1,8 @@
 import z from 'zod'
-import { DatabaseSchema, ListProps, TableInterface, TableSchema } from './interface'
-import { createContextFromHook, useAction, useIndex } from './hooks'
+import { ListProps, TableInterface, TableSchema } from './interface'
+import { createContextFromHook, useAction as useAsyncAction, useIndex } from './hooks'
 import { PropsWithChildren, useCallback, useEffect, useState } from 'react'
-import { ActionProvider, useActionProvider } from './action'
+import { ActionProvider, useAction, useActionProvider } from './action'
 import { FieldsProvider, useFields } from './fields'
 
 export function useDatabaseProvider() {
@@ -39,23 +39,23 @@ export function useInterface<TSchema extends TableSchema>(table: string, {
     find, create, update, remove, list
 }: TableInterface<z.infer<TSchema['readable']>, z.infer<TSchema['writable']>>, index: ReturnType<typeof useIndex<z.infer<TSchema['readable']>>>) {
     return {
-        find: useAction(((props) => find({ ...props, table }).then(res => {
+        find: useAsyncAction(((props) => find({ ...props, table }).then(res => {
             index.set(res)
             return res
         })) as typeof find),
-        create: useAction(((props) => create({ ...props, table }).then(res => {
+        create: useAsyncAction(((props) => create({ ...props, table }).then(res => {
             index.set(res)
             return res
         })) as typeof create),
-        update: useAction(((props) => update({ ...props, table }).then(res => {
+        update: useAsyncAction(((props) => update({ ...props, table }).then(res => {
             index.set(res)
             return res
         })) as typeof update),
-        remove: useAction(((props) => remove({ ...props, table }).then(res => {
+        remove: useAsyncAction(((props) => remove({ ...props, table }).then(res => {
             index.unset(res)
             return res
         })) as typeof remove),
-        list: useAction(((props) => list({ ...props, table }).then(arr => {
+        list: useAsyncAction(((props) => list({ ...props, table }).then(arr => {
             index.set(...arr)
             return arr
         })) as typeof list),
@@ -225,4 +225,31 @@ export function FilterForm<TSchema extends TableSchema>({
             )}
         </FieldsProvider>
     )
+}
+
+export const useCreateForm = <TSchema extends TableSchema>(schema: TSchema) => {
+    return {
+      ...useFields<z.infer<TSchema['writable']>>(),
+      ...useAction<
+        z.infer<TSchema['writable']>,
+        z.infer<TSchema['readable']>
+      >(),
+    }
+}
+export const useUpdateForm = <TSchema extends TableSchema>(schema: TSchema) => {
+    return {
+      ...useFields<Partial<z.infer<TSchema['writable']>>>(),
+      ...useAction<
+        Partial<z.infer<TSchema['writable']>>,
+        z.infer<TSchema['readable']>
+      >(),
+    }
+}
+export const useFiltersForm = <TSchema extends TableSchema>(schema: TSchema) => {
+    return {
+      ...useFields<z.infer<TSchema['readable']>>(),
+      ...useAction<z.infer<TSchema['readable']>,
+        z.infer<TSchema['readable']>[]
+      >(),
+    }
 }
