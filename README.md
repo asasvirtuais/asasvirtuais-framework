@@ -191,7 +191,7 @@ function DeleteButton({ userId }: { userId: string }) {
 
 ## React Interface: Data-Driven Applications
 
-The `react-interface` package provides a complete abstraction for building data-driven React apps. Define your schema once, and get type-safe hooks and components automatically wired to your API.
+The `react-interface` package provides components and hooks for building data-driven React apps. Define your schema once, and use the components directly—no initialization needed.
 
 ### Complete Todo App Example
 
@@ -201,53 +201,68 @@ The `react-interface` package provides a complete abstraction for building data-
 // app/database.ts
 import { z } from 'zod';
 
-export const schema = {
-  todos: {
-    readable: z.object({
-      id: z.string(),
-      text: z.string(),
-      completed: z.boolean(),
-      createdAt: z.date(),
-    }),
-    writable: z.object({
-      text: z.string(),
-      completed: z.boolean().optional(),
-    }),
-  },
-};
+export const todoSchema = {
+  readable: z.object({
+    id: z.string(),
+    text: z.string(),
+    completed: z.boolean(),
+    createdAt: z.date(),
+  }),
+  writable: z.object({
+    text: z.string(),
+    completed: z.boolean().optional(),
+  }),
+}
+
+// You can export multiple schemas
+export const userSchema = {
+  readable: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+  }),
+  writable: z.object({
+    name: z.string(),
+    email: z.string(),
+  }),
+}
 ```
 
-#### 2. Initialize the Interface
+#### 2. Create Your Table Interface
 
 ```typescript
 // app/interface.ts
-import { reactInterface } from '@asasvirtuais/interface';
-import { schema } from './database';
+import { fetchInterface } from '@asasvirtuais/fetch-interface'
+import { todoSchema } from './database'
 
-export const {
-  DatabaseProvider,
-  useTable,
-  CreateForm,
-  UpdateForm,
-  FilterForm,
-  SingleProvider,
-  useSingle,
-} = reactInterface<typeof schema>(schema, yourDataInterface);
+// Create interface for your API
+export const todosInterface = fetchInterface({
+  schema: todoSchema,
+  defaultTable: 'todos',
+  baseUrl: '/api/v1'
+})
 ```
 
-#### 3. Provide Data Context
+#### 3. Provide Table Context
 
 ```tsx
-// app/layout.tsx
-import { DatabaseProvider } from '@/app/interface';
+// app/todos/layout.tsx
+import { TableProvider } from '@asasvirtuais/react-interface'
+import { todoSchema, todosInterface } from '@/app/interface'
 
-export default async function RootLayout({ children }) {
-  const initialTodos = await fetchTodos();
+export default async function TodosLayout({ children }) {
+  const initialTodos = await fetchTodos()
+  
   return (
-    <DatabaseProvider todos={initialTodos}>
+    <TableProvider
+      table="todos"
+      schema={todoSchema}
+      interface={todosInterface}
+      asAbove={initialTodos}
+    >
       {children}
-    </DatabaseProvider>
-  );
+    </TableProvider>
+  )
 }
 ```
 
@@ -255,16 +270,19 @@ export default async function RootLayout({ children }) {
 
 ```tsx
 // app/todos/page.tsx
-'use client';
-import { useTable, CreateForm } from '@/app/interface';
+'use client'
+import { useDatabaseTable, CreateForm } from '@asasvirtuais/react-interface'
+import { todoSchema } from '@/app/database'
 
 function TodoList() {
-  const { array: todos, remove, update } = useTable('todos');
+  const { index, remove, update } = useDatabaseTable('todos')
+  const todos = Object.values(index.index)
 
   return (
     <>
-      <CreateForm<typeof schema, 'todos'>
+      <CreateForm
         table="todos"
+        schema={todoSchema}
         defaults={{ text: '' }}
       >
         {({ fields, setField, submit, loading }) => (
@@ -300,7 +318,42 @@ function TodoList() {
         ))}
       </ul>
     </>
-  );
+  )
+}
+```
+
+#### 5. Multiple Tables with DatabaseProvider
+
+For apps with multiple tables, wrap them all in a DatabaseProvider:
+
+```tsx
+// app/layout.tsx
+import { DatabaseProvider, TableProvider } from '@asasvirtuais/react-interface'
+import { todoSchema, userSchema } from './database'
+import { todosInterface, usersInterface } from './interface'
+
+export default async function RootLayout({ children }) {
+  const [initialTodos, initialUsers] = await Promise.all([
+    fetchTodos(),
+    fetchUsers()
+  ])
+  
+  return (
+    <DatabaseProvider>
+      <TableProvider table="todos" schema={todoSchema} interface={todosInterface} asAbove={initialTodos}>
+        <TableProvider table="users" schema={userSchema} interface={usersInterface} asAbove={initialUsers}>
+          {children}
+        </TableProvider>
+      </TableProvider>
+    </DatabaseProvider>
+  )
+}
+
+// Now any component can access tables:
+function MyComponent() {
+  const todos = useDatabaseTable('todos')
+  const users = useDatabaseTable('users')
+  // ...
 }
 ```
 
@@ -374,8 +427,12 @@ In React, you control exactly when effects happen by writing code around form ac
 Run code before submission:
 
 ```tsx
-<CreateForm<typeof schema, 'messages'>
+import { CreateForm } from '@asasvirtuais/react-interface'
+import { messageSchema } from '@/app/database'
+
+<CreateForm
   table="messages"
+  schema={messageSchema}
   defaults={{ content: '' }}
 >
   {({ fields, setField, submit, loading }) => (
@@ -405,8 +462,9 @@ Run code before submission:
 Run code after successful submission:
 
 ```tsx
-<CreateForm<typeof schema, 'messages'>
+<CreateForm
   table="messages"
+  schema={messageSchema}
   defaults={{ content: '' }}
   onSuccess={(message) => {
     // Post-flight effects - run after success
@@ -423,6 +481,39 @@ Run code after successful submission:
 </CreateForm>
 ```
 
+#### Using Field Values Without Submitting
+
+Sometimes you want to use the form's field values without calling the server action:
+
+```tsx
+<CreateForm
+  table="messages"
+  schema={messageSchema}
+  defaults={{ content: '' }}
+>
+  {(form) => (
+    <div>
+      <textarea
+        value={form.fields.content}
+        onChange={(e) => form.setField('content', e.target.value)}
+      />
+      
+      {/* This button calls the server action */}
+      <button onClick={form.submit}>Send to Server</button>
+      
+      {/* This button uses field values without calling the action */}
+      <button onClick={() => {
+        // Just use the field values directly for local operations
+        saveToLocalStorage(form.fields)
+        showPreview(form.fields)
+      }}>
+        Save Draft Locally
+      </button>
+    </div>
+  )}
+</CreateForm>
+```
+
 ### Backend Effects (API Routes)
 
 On the backend, effects are just functions wrapping other functions. No framework magic.
@@ -433,10 +524,10 @@ On the backend, effects are just functions wrapping other functions. No framewor
 // app/api/v1/[...params]/route.ts
 import { tableInterface } from '@asasvirtuais/interface'
 import { firestoreInterface } from '@/lib/firestore'
-import { schema } from '@/app/database'
+import { messageSchema } from '@/app/database'
 
 // Wrap your base interface with business logic
-const messagesInterface = tableInterface(schema, 'messages', {
+const messagesInterface = tableInterface(messageSchema, 'messages', {
   async create(props) {
     // Pre-flight validation
     await checkUserQuota(props.data.userId)
@@ -482,7 +573,7 @@ const messagesInterface = tableInterface(schema, 'messages', {
   find: firestoreInterface.find,
   list: firestoreInterface.list,
 })
-```
+
 
 ### Key Principles
 
