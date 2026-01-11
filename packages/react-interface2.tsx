@@ -1,7 +1,7 @@
 import z from 'zod'
 import { ListProps, TableInterface, TableSchema } from './interface'
 import { createContextFromHook, useAction as useAsyncAction, useIndex } from './hooks'
-import { PropsWithChildren, useCallback, useEffect, useState } from 'react'
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useState } from 'react'
 import { ActionProvider, useAction, useActionProvider } from './action'
 import { FieldsProvider, useFields } from './fields'
 
@@ -39,6 +39,7 @@ export function useInterface<TSchema extends TableSchema>(table: string, {
     find, create, update, remove, list
 }: TableInterface<z.infer<TSchema['readable']>, z.infer<TSchema['writable']>>, index: ReturnType<typeof useIndex<z.infer<TSchema['readable']>>>) {
     return {
+        index,
         find: useAsyncAction(((props) => find({ ...props, table }).then(res => {
             index.set(res)
             return res
@@ -227,29 +228,88 @@ export function FilterForm<TSchema extends TableSchema>({
     )
 }
 
-export const useCreateForm = <TSchema extends TableSchema>(schema: TSchema) => {
+export function useCreateForm<TSchema extends TableSchema>(schema: TSchema) {
     return {
-      ...useFields<z.infer<TSchema['writable']>>(),
-      ...useAction<
-        z.infer<TSchema['writable']>,
-        z.infer<TSchema['readable']>
-      >(),
+        ...useFields<z.infer<TSchema['writable']>>(),
+        ...useAction<
+            z.infer<TSchema['writable']>,
+            z.infer<TSchema['readable']>
+        >()
     }
 }
-export const useUpdateForm = <TSchema extends TableSchema>(schema: TSchema) => {
+
+export function useUpdateForm<TSchema extends TableSchema>(schema: TSchema) {
     return {
-      ...useFields<Partial<z.infer<TSchema['writable']>>>(),
-      ...useAction<
-        Partial<z.infer<TSchema['writable']>>,
-        z.infer<TSchema['readable']>
-      >(),
+        ...useFields<Partial<z.infer<TSchema['writable']>>>(),
+        ...useAction<
+            Partial<z.infer<TSchema['writable']>>,
+            z.infer<TSchema['readable']>
+        >()
     }
 }
-export const useFiltersForm = <TSchema extends TableSchema>(schema: TSchema) => {
+
+export function useFiltersForm <TSchema extends TableSchema>(schema: TSchema) {
     return {
-      ...useFields<z.infer<TSchema['readable']>>(),
-      ...useAction<z.infer<TSchema['readable']>,
-        z.infer<TSchema['readable']>[]
-      >(),
+        ...useFields<z.infer<TSchema['readable']>>(),
+        ...useAction<z.infer<TSchema['readable']>,
+            z.infer<TSchema['readable']>[]
+        >()
     }
+}
+
+export function useSingleProvider<T>({
+    id,
+    table,
+}: {
+    id: string
+    table: string
+}) {
+    const { index, find } = useDatabaseTable(table)
+    const [single, setSingle] = useState<T>(
+        // @ts-expect-error
+        () => index[id as keyof typeof index]
+    )
+    useEffect(() => {
+        // @ts-expect-error
+        if (!single) find.trigger({ id }).then(setSingle)
+    }, [])
+    useEffect(() => {
+        // @ts-expect-error
+        setSingle(index[id as keyof typeof index])
+    }, [index[id as keyof typeof index]])
+    return {
+        id,
+        single,
+        setSingle,
+        loading: find.loading,
+    }
+}
+
+export const SingleContext = createContext<
+    ReturnType<typeof useSingleProvider> | undefined
+>(undefined)
+
+export function SingleProvider<T>({
+    children,
+    ...props
+}: {
+    id: string
+    table: string
+    children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider>) => React.ReactNode)
+}) {
+    const value = useSingleProvider(props)
+    if (!value.single) return null
+    return (
+        <SingleContext.Provider value={value}>
+            {typeof children === 'function' ? (
+                children(value)
+            ) : (
+                children
+            )}
+        </SingleContext.Provider>
+    )
+}
+
+export function useSingle<T>() {
+    return useContext(SingleContext) as ReturnType<typeof useSingleProvider<T>>
 }
