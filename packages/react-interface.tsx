@@ -1,383 +1,315 @@
-import { z } from 'zod'
-import {
-  useState,
-  useCallback,
-  useEffect,
-  useMemo,
-  createContext,
-  useContext,
-} from 'react'
-
-import { useAction as useAsyncAction, useIndex } from './hooks'
+import z from 'zod'
+import { DatabaseSchema, ListProps, TableInterface, TableSchema } from './interface'
+import { createContextFromHook, useAction as useAsyncAction, useIndex } from './hooks'
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useState } from 'react'
 import { ActionProvider, useAction, useActionProvider } from './action'
-import { TableInterface, ListProps, DatabaseSchema } from './interface'
 import { FieldsProvider, useFields } from './fields'
 
-export function reactInterface<
-  Database extends DatabaseSchema>(
-  database: Database,
-  {
-    find,
-    create,
-    update,
-    remove,
-    list,
-  }: TableInterface<
-    z.infer<Database[keyof Database]['readable']>,
-    z.infer<Database[keyof Database]['writable']>
-  >
-) {
-  type TableKey = keyof Database & string
+export function useDatabaseProvider() {
 
-  type TableProviderProps<Table extends TableKey> = {
-    table: Table
-    asAbove?: Record<string, z.infer<Database[Table]["readable"]>>
-  }
+    const [database, setDatabase] = useState<Record<string, ReturnType<typeof useInterface<any>>>>({})
 
-  function useTableProvider<Table extends TableKey>({
+    return {
+        database,
+        setDatabase,
+    }
+}
+
+export const [DatabaseProvider, useDatabase] = createContextFromHook(useDatabaseProvider)
+
+export function useDatabaseTable<TSchema extends TableSchema>(table: string) {
+    const { database } = useDatabase()
+
+    const tableMethods = database[table] as ReturnType<typeof useInterface<TSchema>> | undefined
+
+    if (!tableMethods)
+        throw new Error(`Table "${table}" is not defined in the database schema.`)
+
+    return tableMethods
+}
+
+export type TableProviderProps<TSchema extends TableSchema> = {
+    table: string
+    schema: TSchema
+    interface: TableInterface<z.infer<TSchema['readable']>, z.infer<TSchema['writable']>>
+    asAbove?: Record<string, z.infer<TSchema['readable']>>
+}
+
+export function useInterface<TSchema extends TableSchema>(table: string, {
+    find, create, update, remove, list
+}: TableInterface<z.infer<TSchema['readable']>, z.infer<TSchema['writable']>>, index: ReturnType<typeof useIndex<z.infer<TSchema['readable']>>>) {
+    return {
+        index,
+        find: useAsyncAction(((props) => find({ ...props, table }).then(res => {
+            index.set(res)
+            return res
+        })) as typeof find),
+        create: useAsyncAction(((props) => create({ ...props, table }).then(res => {
+            index.set(res)
+            return res
+        })) as typeof create),
+        update: useAsyncAction(((props) => update({ ...props, table }).then(res => {
+            index.set(res)
+            return res
+        })) as typeof update),
+        remove: useAsyncAction(((props) => remove({ ...props, table }).then(res => {
+            index.unset(res)
+            return res
+        })) as typeof remove),
+        list: useAsyncAction(((props) => list({ ...props, table }).then(arr => {
+            index.set(...arr)
+            return arr
+        })) as typeof list),
+    }
+}
+
+export function useTableProvider<TSchema extends TableSchema>({
     table,
+    schema,
+    interface: tableInterface,
     asAbove,
-  }: TableProviderProps<Table>) {
-    type Readable = z.infer<Database[Table]['readable']>
-    type Writable = z.infer<Database[Table]['writable']>
+}: TableProviderProps<TSchema>) {
+
+    type Readable = z.infer<TableSchema['readable']>
 
     const index = useIndex<Readable>({ ...(asAbove ?? {}) })
 
-    const array = useMemo(
-      () => Object.values(index.index) as Readable[],
-      [index.index]
-    )
-
     useEffect(function soBelow() {
-      index.setIndex((prev) => ({ ...prev, ...asAbove }))
+        index.setIndex((prev) => ({ ...prev, ...asAbove }))
     }, [])
 
-    const methods = { find, create, update, remove, list } as TableInterface<
-      Readable,
-      Writable
-    >
+    return useInterface<TSchema>(table, tableInterface, index)
+}
 
-    return {
-      ...index,
-      array,
-      find: useAsyncAction(((props) => methods.find({ ...props, table }).then(res => {
-        index.set(res)
-        return res
-      })) as typeof find),
-      create: useAsyncAction(((props) => create({ ...props, table }).then(res => {
-        index.set(res)
-        return res
-      })) as typeof create),
-      update: useAsyncAction(((props) => update({ ...props, table }).then(res => {
-        index.set(res)
-        return res
-      })) as typeof update),
-      remove: useAsyncAction(((props) => remove({ ...props, table }).then(res => {
-        index.unset(res)
-        return res
-      })) as typeof remove),
-      list: useAsyncAction(((props) => list({ ...props, table }).then(arr => {
-        index.set(...arr)
-        return arr
-      })) as typeof list),
-    }
-  }
-  // Create a separate context for each table dynamically
-  const tableContexts = new Map<TableKey, React.Context<ReturnType<typeof useTableProvider<any>> | undefined>>();
+export const [TableContextProvider, useTableContext] = createContextFromHook(useTableProvider<any>)
 
-  function getTableContext<T extends TableKey>(table: T) {
-    if (!tableContexts.has(table)) {
-      tableContexts.set(table, createContext<ReturnType<typeof useTableProvider<T>> | undefined>(undefined));
-    }
-    return tableContexts.get(table)!;
-  }
+export function TableProvider<TSchema extends TableSchema>({ children, ...props }: PropsWithChildren<TableProviderProps<TSchema>>) {
+    return <TableContextProvider {...props}>{children}</TableContextProvider>
+}
 
-  function TableProvider<Table extends TableKey>({ children, ...props }: TableProviderProps<Table> & {
-    children: React.ReactNode | ((props: ReturnType<typeof useTableProvider<Table>>) => React.ReactNode)
-  }) {
-    const context = useTableProvider(props);
-    const TableContext = getTableContext(props.table);
+export function useTable<TSchema extends TableSchema>() {
+    return useTableContext() as ReturnType<typeof useTableProvider<TSchema>>
+}
+
+export function CreateForm<TSchema extends TableSchema>({ table, defaults, onSuccess, children }: {
+    table: string
+    schema: TSchema
+    defaults?: Partial<z.infer<TSchema['writable']>>
+    onSuccess?: (result: z.infer<TSchema['readable']>) => void
+    children: React.ReactNode | (
+        (props: ReturnType<typeof useActionProvider<z.infer<TSchema['writable']>, z.infer<TSchema['readable']>>>
+            & ReturnType<typeof useFields<z.infer<TSchema['writable']>>>
+        ) => React.ReactNode
+    )
+}) {
+    type Readable = z.infer<TSchema['readable']>
+    type Writable = z.infer<TSchema['writable']>
+
+    const { create } = useDatabaseTable(table)
+
+    const callback = useCallback(
+        async (fields: Writable) => {
+            const result = await create.trigger({ data: fields })
+            if (onSuccess) onSuccess(result as Readable)
+            return result
+        },
+        [create, onSuccess]
+    )
 
     return (
-      <TableContext.Provider value={context}>
-        {typeof children === 'function' ? children(context) : children}
-      </TableContext.Provider>
+        <FieldsProvider<Writable> defaults={defaults || ({} as Writable)}>
+            {fields => (
+                <ActionProvider<Writable, Readable> action={callback} params={fields.fields}>
+                    {typeof children === 'function' ? (
+                        form => children({ ...form, ...fields })
+                    ) : (
+                        children
+                    )}
+                </ActionProvider>
+            )}
+        </FieldsProvider>
     )
-  }
+}
 
-  function DatabaseProvider({
+export function UpdateForm<TSchema extends TableSchema>({
+    schema,
+    table,
+    id,
+    defaults,
+    onSuccess,
     children,
-    ...tables
-  }: React.PropsWithChildren<{
-    [T in TableKey]?: Record<string, z.infer<Database[T]['readable']>>
-  }>) {
-    return Object.entries(tables).reduce(
-      (prev, [table, asAbove]) => {
-        return (
-          <TableProvider table={table as TableKey} asAbove={asAbove}>
-            {prev}
-          </TableProvider>
-        );
-      },
-      children as React.ReactNode
+}: {
+    schema: TSchema
+    table: string
+    id: string
+    defaults?: Partial<z.infer<TSchema['writable']>>
+    onSuccess?: (result: z.infer<TSchema['readable']>) => void
+    children: React.ReactNode | (
+        (props: ReturnType<typeof useActionProvider<Partial<z.infer<TSchema['writable']>>, z.infer<TSchema['readable']>>>
+            & ReturnType<typeof useFields<z.infer<TSchema['writable']>>>
+        ) => React.ReactNode
     )
-  }
+}) {
+    type Readable = z.infer<TSchema['readable']>
+    type Writable = z.infer<TSchema['writable']>
 
-  function useTable<T extends TableKey>(name: T) {
-    const TableContext = getTableContext(name);
-    const context = useContext(TableContext);
+    const { update } = useDatabaseTable(table)
 
-    if (!context) {
-      throw new Error(`useTable("${String(name)}") must be used within a TableProvider or DatabaseProvider with table="${String(name)}"`);
+    const callback = useCallback(
+        async (fields: Partial<Writable>) => {
+            const result = await update.trigger({ id, data: fields })
+            if (onSuccess) onSuccess(result as Readable)
+            return result
+        },
+        [update, id, onSuccess]
+    )
+
+    return (
+        <FieldsProvider<Writable>
+            defaults={defaults || ({} as Partial<Writable>)}
+        >
+            {fields => (
+                <ActionProvider<Partial<Writable>, Readable> action={callback} params={fields.fields}>
+                    {typeof children === 'function' ? (
+                        form => children({ ...form, ...fields })
+                    ) : (
+                        children
+                    )}
+                </ActionProvider>
+            )}
+        </FieldsProvider>
+    )
+}
+
+export function FilterForm<TSchema extends TableSchema>({
+    schema,
+    table,
+    defaults,
+    onSuccess,
+    children,
+}: {
+    schema: TSchema
+    table: string
+    defaults?: Partial<ListProps<z.infer<TSchema['readable']>>>
+    onSuccess?: (result: z.infer<TSchema['readable']>[]) => void
+    children: React.ReactNode | (
+        (props: ReturnType<typeof useActionProvider<ListProps<z.infer<TSchema['readable']>>, z.infer<TSchema['readable']>[]>>
+            & ReturnType<typeof useFields<ListProps<z.infer<TSchema['readable']>>>>
+        ) => React.ReactNode
+    )
+}) {
+    type Readable = z.infer<TSchema['readable']>
+
+    const { list } = useDatabaseTable(table)
+
+    const callback = useCallback(
+        async (fields: Omit<ListProps<Readable>, 'table'>) => {
+            const result = await list.trigger(fields)
+            if (onSuccess) onSuccess(result)
+            return result
+        },
+        [list, onSuccess]
+    )
+
+    return (
+        <FieldsProvider<ListProps<Readable>>
+            defaults={(defaults || { query: {} }) as ListProps<Readable>}
+        >
+            {fields => (
+                <ActionProvider<ListProps<Readable>, Readable[]> action={callback} params={fields.fields}>
+                    {typeof children === 'function' ? (
+                        form => children({ ...form, ...fields })
+                    ) : (
+                        children
+                    )}
+                </ActionProvider>
+            )}
+        </FieldsProvider>
+    )
+}
+
+export function useCreateForm<TSchema extends TableSchema>(schema: TSchema) {
+    return {
+        ...useFields<z.infer<TSchema['writable']>>(),
+        ...useAction<
+            z.infer<TSchema['writable']>,
+            z.infer<TSchema['readable']>
+        >()
     }
+}
 
-    return context as ReturnType<typeof useTableProvider<T>>;
-  }
+export function useUpdateForm<TSchema extends TableSchema>(schema: TSchema) {
+    return {
+        ...useFields<Partial<z.infer<TSchema['writable']>>>(),
+        ...useAction<
+            Partial<z.infer<TSchema['writable']>>,
+            z.infer<TSchema['readable']>
+        >()
+    }
+}
 
-  function useSingleProvider<Table extends TableKey>({
+export function useFiltersForm <TSchema extends TableSchema>(schema: TSchema) {
+    return {
+        ...useFields<z.infer<TSchema['readable']>>(),
+        ...useAction<z.infer<TSchema['readable']>,
+            z.infer<TSchema['readable']>[]
+        >()
+    }
+}
+
+export function useSingleProvider<T>({
     id,
     table,
-  }: {
+}: {
     id: string
-    table: Table
-  }) {
-    const { index, find } = useTable(table)
-    const [single, setSingle] = useState<z.infer<Database[Table]['readable']>>(
-      () => index[id]
+    table: string
+}) {
+    const { index, find } = useDatabaseTable(table)
+    const [single, setSingle] = useState<T>(
+        // @ts-expect-error
+        () => index[id as keyof typeof index]
     )
     useEffect(() => {
-      if (!single) find.trigger({ id }).then(setSingle)
+        // @ts-expect-error
+        if (!single) find.trigger({ id }).then(setSingle)
     }, [])
     useEffect(() => {
-      setSingle(index[id])
-    }, [index[id]])
+        // @ts-expect-error
+        setSingle(index[id as keyof typeof index])
+    }, [index[id as keyof typeof index]])
     return {
-      id,
-      single,
-      setSingle,
-      loading: find.loading,
+        id,
+        single,
+        setSingle,
+        loading: find.loading,
     }
-  }
+}
 
-  const SingleContext = createContext<
-    ReturnType<typeof useSingleProvider<any>> | undefined
-  >(undefined)
+export const SingleContext = createContext<
+    ReturnType<typeof useSingleProvider> | undefined
+>(undefined)
 
-  function SingleProvider<Table extends TableKey>({
+export function SingleProvider<T>({
     children,
     ...props
-  }: {
+}: {
     id: string
-    table: Table
-    children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider<Table>>) => React.ReactNode)
-  }) {
+    table: string
+    children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider>) => React.ReactNode)
+}) {
     const value = useSingleProvider(props)
     if (!value.single) return null
     return (
-      <SingleContext.Provider value={value}>
-        {typeof children === 'function' ? (
-          children(value)
-        ) : (
-          children
-        )}
-      </SingleContext.Provider>
-    )
-  }
-
-  const useSingle = <Table extends TableKey>(table: Table) =>
-    useContext(SingleContext) as ReturnType<typeof useSingleProvider<Table>>
-
-  function CreateForm<
-    T extends TableKey
-  >({
-    table,
-    defaults,
-    onSuccess,
-    children,
-  }: {
-    table: T
-    defaults?: Partial<z.infer<Database[T]['writable']>>
-    onSuccess?: (result: z.infer<Database[T]['readable']>) => void
-    children: React.ReactNode | (
-      ( props: ReturnType<typeof useActionProvider<z.infer<Database[T]['writable']>, z.infer<Database[T]['readable']>>>
-        & ReturnType<typeof useFields<z.infer<Database[T]['writable']>>>
-      ) => React.ReactNode
-    )
-  }) {
-    type Readable = z.infer<Database[T]['readable']>
-    type Writable = z.infer<Database[T]['writable']>
-
-    const { create } = useTable(table)
-
-    const callback = useCallback(
-      async (fields: Writable) => {
-        const result = await create.trigger({ data: fields })
-        if (onSuccess) onSuccess(result as Readable)
-        return result
-      },
-      [create, onSuccess]
-    )
-
-    return (
-      <FieldsProvider<Writable> defaults={defaults || ({} as Writable)}>
-        {fields => (
-          <ActionProvider<Writable, Readable> action={callback} params={fields.fields}>
+        <SingleContext.Provider value={value}>
             {typeof children === 'function' ? (
-              form => children({ ...form, ...fields })
+                children(value)
             ) : (
-              children
+                children
             )}
-          </ActionProvider>
-        )}
-      </FieldsProvider>
+        </SingleContext.Provider>
     )
-  }
-
-  function UpdateForm<T extends TableKey>({
-    table,
-    id,
-    defaults,
-    onSuccess,
-    children,
-  }: {
-    table: T
-    id: string
-    defaults?: Partial<z.infer<Database[T]['writable']>>
-    onSuccess?: (result: z.infer<Database[T]['readable']>) => void
-    children: React.ReactNode | (
-      (props: ReturnType<typeof useActionProvider<Partial<z.infer<Database[T]['writable']>>, z.infer<Database[T]['readable']>>>
-        & ReturnType<typeof useFields<z.infer<Database[T]['writable']>>>
-      ) => React.ReactNode
-    )
-  }) {
-    type Readable = z.infer<Database[T]['readable']>
-    type Writable = z.infer<Database[T]['writable']>
-
-    const { update } = useTable(table)
-
-    const callback = useCallback(
-      async (fields: Partial<Writable>) => {
-        const result = await update.trigger({ id, data: fields })
-        if (onSuccess) onSuccess(result as Readable)
-        return result
-      },
-      [update, id, onSuccess]
-    )
-
-    return (
-      <FieldsProvider<Writable>
-        defaults={defaults || ({} as Partial<Writable>)}
-      >
-        {fields => (
-          <ActionProvider<Partial<Writable>, Readable> action={callback} params={fields.fields}>
-            {typeof children === 'function' ? (
-              form => children({ ...form, ...fields })
-            ) : (
-              children
-            )}
-          </ActionProvider>
-        )}
-      </FieldsProvider>
-    )
-  }
-
-  function FilterForm<T extends TableKey>({
-    table,
-    defaults,
-    onSuccess,
-    children,
-  }: {
-    table: T
-    defaults?: Partial<ListProps<z.infer<Database[T]['readable']>>>
-    onSuccess?: (result: z.infer<Database[T]['readable']>[]) => void
-    children: React.ReactNode | (
-      ( props: ReturnType<typeof useActionProvider<ListProps<z.infer<Database[T]['readable']>>, z.infer<Database[T]['readable']>[]>>
-        & ReturnType<typeof useFields<ListProps<z.infer<Database[T]['readable']>>>>
-      ) => React.ReactNode
-    )
-  }) {
-    type Readable = z.infer<Database[T]['readable']>
-    type Writable = z.infer<Database[T]['writable']>
-
-    const { list } = useTable(table)
-
-    const callback = useCallback(
-      async (fields: Omit<ListProps<Readable>, 'table'>) => {
-        const result = await list.trigger(fields)
-        if (onSuccess) onSuccess(result)
-        return result
-      },
-      [list, onSuccess]
-    )
-
-    return (
-      <FieldsProvider<ListProps<Readable>>
-        defaults={(defaults || { query: {} }) as ListProps<Readable>}
-      >
-        {fields => (
-          <ActionProvider<ListProps<Readable>, Readable[]> action={callback} params={fields.fields}>
-            {typeof children === 'function' ? (
-              form => children({ ...form, ...fields })
-            ) : (
-              children
-            )}
-          </ActionProvider>
-        )}
-      </FieldsProvider>
-    )
-  }
-
-  const useCreateForm = <T extends TableKey>(table: T) => {
-    return {
-      ...useFields<z.infer<Database[T]['writable']>>(),
-      ...useAction<
-        z.infer<Database[T]['writable']>,
-        z.infer<Database[T]['readable']>
-      >(),
-    }
-  }
-  const useUpdateForm = <T extends TableKey>(table: T) => {
-    return {
-      ...useFields<Partial<z.infer<Database[T]['writable']>>>(),
-      ...useAction<
-        Partial<z.infer<Database[T]['writable']>>,
-        z.infer<Database[T]['readable']>
-      >(),
-    }
-  }
-  const useFiltersForm = <T extends TableKey>(table: T) => {
-    return {
-      ...useFields<z.infer<Database[T]['readable']>>(),
-      ...useAction<z.infer<Database[T]['readable']>,
-        z.infer<Database[T]['readable']>[]
-      >(),
-    }
-  }
-
-  return {
-    DatabaseProvider,
-    useTable,
-    useTableProvider,
-    TableProvider,
-    SingleProvider,
-    useSingle,
-    CreateForm,
-    UpdateForm,
-    FilterForm,
-    useCreateForm,
-    useUpdateForm,
-    useFiltersForm,
-  }
 }
 
-export class ReactInterface<Database extends DatabaseSchema> {
-  constructor(
-    database: Database,
-    tableInterface: TableInterface<
-        z.infer<Database[keyof Database]['readable']>,
-        z.infer<Database[keyof Database]['writable']>
-    >
-  ) {
-    return reactInterface(database, tableInterface)
-  }
+export function useSingle<T>() {
+    return useContext(SingleContext) as ReturnType<typeof useSingleProvider<T>>
 }
