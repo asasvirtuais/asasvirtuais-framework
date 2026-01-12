@@ -39,6 +39,10 @@
     "./next-interface": {
       "types": "./packages/next-interface.tsx",
       "default": "./packages/next-interface.tsx"
+    },
+    "./fetch-interface": {
+      "types": "./packages/fetch-interface.tsx",
+      "default": "./packages/fetch-interface.tsx"
     }
   },
   "peerDependencies": {
