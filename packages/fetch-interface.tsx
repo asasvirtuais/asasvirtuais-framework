@@ -13,7 +13,7 @@ export function fetchInterface<Schema extends TableSchema, Table extends string>
   defaultTable?: Table
   baseUrl?: string
   headers?: Record<string, string>
-}): TableInterface<z.infer<TableSchema['readable']>, z.infer<TableSchema['writable']>> {
+}): TableInterface<z.infer<Schema['readable']>, z.infer<Schema['writable']>> {
 
   return {
     async find({ table = defaultTable as string, id }) {
