@@ -70,7 +70,7 @@ export function useTableProvider<TSchema extends TableSchema>({
     asAbove,
 }: TableProviderProps<TSchema>) {
 
-    type Readable = z.infer<TableSchema['readable']>
+    type Readable = z.infer<TSchema['readable']>
 
     const index = useIndex<Readable>({ ...(asAbove ?? {}) })
 
@@ -105,7 +105,7 @@ export function CreateForm<TSchema extends TableSchema>({ table, defaults, onSuc
     type Readable = z.infer<TSchema['readable']>
     type Writable = z.infer<TSchema['writable']>
 
-    const { create } = useDatabaseTable(table)
+    const { create } = useDatabaseTable<TSchema>(table)
 
     const callback = useCallback(
         async (fields: Writable) => {
@@ -153,7 +153,7 @@ export function UpdateForm<TSchema extends TableSchema>({
     type Readable = z.infer<TSchema['readable']>
     type Writable = z.infer<TSchema['writable']>
 
-    const { update } = useDatabaseTable(table)
+    const { update } = useDatabaseTable<TSchema>(table)
 
     const callback = useCallback(
         async (fields: Partial<Writable>) => {
@@ -200,7 +200,7 @@ export function FilterForm<TSchema extends TableSchema>({
 }) {
     type Readable = z.infer<TSchema['readable']>
 
-    const { list } = useDatabaseTable(table)
+    const { list } = useDatabaseTable<TSchema>(table)
 
     const callback = useCallback(
         async (fields: Omit<ListProps<Readable>, 'table'>) => {
