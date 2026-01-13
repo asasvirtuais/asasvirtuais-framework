@@ -1,7 +1,8 @@
+'use client'
 import z from 'zod'
 import { DatabaseSchema, ListProps, TableInterface, TableSchema } from './interface'
 import { createContextFromHook, useAction as useAsyncAction, useIndex } from './hooks'
-import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useState } from 'react'
+import React, { createContext, PropsWithChildren, useCallback, useContext, useEffect, useState } from 'react'
 import { ActionProvider, useAction, useActionProvider } from './action'
 import { FieldsProvider, useFields } from './fields'
 
@@ -78,17 +79,38 @@ export function useTableProvider<TSchema extends TableSchema>({
         index.setIndex((prev) => ({ ...prev, ...asAbove }))
     }, [])
 
-    return useInterface<TSchema>(table, tableInterface, index)
+    const methods = useInterface<TSchema>(table, tableInterface, index)
+
+    return methods
 }
 
-export const [TableContextProvider, useTableContext] = createContextFromHook(useTableProvider<any>)
+const TableContext = createContext<ReturnType<typeof useTableProvider<any>> | undefined>(undefined)
 
-export function TableProvider<TSchema extends TableSchema>({ children, ...props }: PropsWithChildren<TableProviderProps<TSchema>>) {
-    return <TableContextProvider {...props}>{children}</TableContextProvider>
+export function TableProvider<TSchema extends TableSchema>({children, ...props}: React.PropsWithChildren<TableProviderProps<TSchema>>) {
+
+    const context = useTableProvider(props)
+
+    const { database, setDatabase } = useDatabase()
+
+    useEffect(() => {
+        setDatabase(prev => ({
+            [props.table]: context,
+            ...prev,
+        }))
+    }, [])
+
+    if (! database[props.table])
+        return null
+
+    return (
+        <TableContext.Provider value={context}>
+            {children}
+        </TableContext.Provider>
+    )
 }
 
 export function useTable<TSchema extends TableSchema>() {
-    return useTableContext() as ReturnType<typeof useTableProvider<TSchema>>
+    return useContext(TableContext) as ReturnType<typeof useTableProvider<TSchema>>
 }
 
 export function CreateForm<TSchema extends TableSchema>({ table, defaults, onSuccess, children }: {
