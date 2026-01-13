@@ -40,7 +40,6 @@ export function useInterface<TSchema extends TableSchema>(table: string, {
     find, create, update, remove, list
 }: TableInterface<z.infer<TSchema['readable']>, z.infer<TSchema['writable']>>, index: ReturnType<typeof useIndex<z.infer<TSchema['readable']>>>) {
     return {
-        index,
         find: useAsyncAction(((props) => find({ ...props, table }).then(res => {
             index.set(res)
             return res
@@ -81,7 +80,10 @@ export function useTableProvider<TSchema extends TableSchema>({
 
     const methods = useInterface<TSchema>(table, tableInterface, index)
 
-    return methods
+    return {
+        ...methods,
+        ...index
+    }
 }
 
 const TableContext = createContext<ReturnType<typeof useTableProvider<any>> | undefined>(undefined)
@@ -279,59 +281,59 @@ export function useFiltersForm <TSchema extends TableSchema>(schema: TSchema) {
     }
 }
 
-export function useSingleProvider<T>({
-    id,
-    table,
-}: {
-    id: string
-    table: string
-}) {
-    const { index, find } = useDatabaseTable(table)
-    const [single, setSingle] = useState<T>(
-        // @ts-expect-error
-        () => index[id as keyof typeof index]
-    )
-    useEffect(() => {
-        // @ts-expect-error
-        if (!single) find.trigger({ id }).then(setSingle)
-    }, [])
-    useEffect(() => {
-        // @ts-expect-error
-        setSingle(index[id as keyof typeof index])
-    }, [index[id as keyof typeof index]])
-    return {
-        id,
-        single,
-        setSingle,
-        loading: find.loading,
-    }
-}
+// export function useSingleProvider<T>({
+//     id,
+//     table,
+// }: {
+//     id: string
+//     table: string
+// }) {
+//     const { index, find } = useDatabaseTable(table)
+//     const [single, setSingle] = useState<T>(
+//         // @ts-expect-error
+//         () => index[id as keyof typeof index]
+//     )
+//     useEffect(() => {
+//         // @ts-expect-error
+//         if (!single) find.trigger({ id }).then(setSingle)
+//     }, [])
+//     useEffect(() => {
+//         // @ts-expect-error
+//         setSingle(index[id as keyof typeof index])
+//     }, [index[id as keyof typeof index]])
+//     return {
+//         id,
+//         single,
+//         setSingle,
+//         loading: find.loading,
+//     }
+// }
 
-export const SingleContext = createContext<
-    ReturnType<typeof useSingleProvider> | undefined
->(undefined)
+// export const SingleContext = createContext<
+//     ReturnType<typeof useSingleProvider> | undefined
+// >(undefined)
 
-export function SingleProvider<T>({
-    children,
-    ...props
-}: {
-    id: string
-    table: string
-    children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider>) => React.ReactNode)
-}) {
-    const value = useSingleProvider(props)
-    if (!value.single) return null
-    return (
-        <SingleContext.Provider value={value}>
-            {typeof children === 'function' ? (
-                children(value)
-            ) : (
-                children
-            )}
-        </SingleContext.Provider>
-    )
-}
+// export function SingleProvider<T>({
+//     children,
+//     ...props
+// }: {
+//     id: string
+//     table: string
+//     children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider>) => React.ReactNode)
+// }) {
+//     const value = useSingleProvider(props)
+//     if (!value.single) return null
+//     return (
+//         <SingleContext.Provider value={value}>
+//             {typeof children === 'function' ? (
+//                 children(value)
+//             ) : (
+//                 children
+//             )}
+//         </SingleContext.Provider>
+//     )
+// }
 
-export function useSingle<T>() {
-    return useContext(SingleContext) as ReturnType<typeof useSingleProvider<T>>
-}
+// export function useSingle<T>() {
+//     return useContext(SingleContext) as ReturnType<typeof useSingleProvider<T>>
+// }
