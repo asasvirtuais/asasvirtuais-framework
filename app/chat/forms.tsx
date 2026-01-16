@@ -1,4 +1,4 @@
-import { CreateForm, FilterForm, useDatabaseTable } from 'asasvirtuais/react-interface'
+import { CreateForm, FilterForm, useTableInterface } from 'asasvirtuais/react-interface'
 import { schema } from '.'
 import { TitleField } from './fields'
 import { Box, Button, HStack, Stack } from '@chakra-ui/react'
@@ -19,7 +19,7 @@ export function CreateChat() {
 
 export function FilterChats() {
 
-    const { remove } = useDatabaseTable('chats')
+    const { remove } = useTableInterface('chats')
 
     return (
         <FilterForm table='chats' schema={schema}>

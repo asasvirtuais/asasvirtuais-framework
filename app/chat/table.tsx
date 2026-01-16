@@ -1,10 +1,10 @@
 'use client'
-import { TableProvider, useDatabaseTable } from 'asasvirtuais/react-interface'
+import { TableProvider, useTableInterface } from 'asasvirtuais/react-interface'
 import { fetchInterface } from 'asasvirtuais/fetch-interface'
 import { schema } from '.'
 
 export function useChats() {
-    return useDatabaseTable<typeof schema>('chats')
+    return useTableInterface<typeof schema>('chats')
 }
 
 export function ChatsProvider({ children }: { children: React.ReactNode }) {
