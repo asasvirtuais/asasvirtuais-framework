@@ -19,7 +19,7 @@ export function CreateChat() {
 
 export function FilterChats() {
 
-    const { remove } = useTableInterface('chats')
+    const { remove } = useTableInterface('chats', schema)
 
     return (
         <FilterForm table='chats' schema={schema}>

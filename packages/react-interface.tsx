@@ -40,7 +40,7 @@ export function useDatabaseProvider() {
     }
 }
 
-export function useTableIndex<TSchema extends TableSchema>(table: string) {
+export function useTableIndex<TSchema extends TableSchema>(table: string, schema: TSchema) {
     const { indexes, setIndexes } = useDatabase()
     const index = useMemo(() => indexes[table], [indexes, table])
     const array = useMemo(() => Object.values(index || {}) as z.infer<TSchema['readable']>[], [index])
@@ -80,7 +80,7 @@ export function useTableIndex<TSchema extends TableSchema>(table: string) {
 
 export const [DatabaseProvider, useDatabase] = createContextFromHook(useDatabaseProvider)
 
-export function useTableInterface<TSchema extends TableSchema>(table: string) {
+export function useTableInterface<TSchema extends TableSchema>(table: string, schema: TSchema) {
     const { interfaces } = useDatabase()
 
     const tableMethods = interfaces[table] as ReturnType<typeof useInterface<TSchema>> | undefined
@@ -98,7 +98,7 @@ export type TableProviderProps<TSchema extends TableSchema> = {
     asAbove?: Record<string, z.infer<TSchema['readable']>>
 }
 
-export function useInterface<TSchema extends TableSchema>(table: string, {
+export function useInterface<TSchema extends TableSchema>(table: string, schema: TSchema,  {
     find, create, update, remove, list
 }: TableInterface<z.infer<TSchema['readable']>, z.infer<TSchema['writable']>>, index: ReturnType<typeof useIndex<z.infer<TSchema['readable']>>>) {
     return {
@@ -140,7 +140,7 @@ export function useTableProvider<TSchema extends TableSchema>({
         index.setIndex((prev) => ({ ...prev, ...asAbove }))
     }, [])
 
-    const methods = useInterface<TSchema>(table, tableInterface, index)
+    const methods = useInterface<TSchema>(table, schema, tableInterface, index)
 
     const { interfaces, setInterfaces, indexes, setIndexes } = useDatabase()
 
@@ -179,7 +179,7 @@ export function useTable<TSchema extends TableSchema>() {
     return useContext(TableContext) as ReturnType<typeof useTableProvider<TSchema>>
 }
 
-export function CreateForm<TSchema extends TableSchema>({ table, defaults, onSuccess, children }: {
+export function CreateForm<TSchema extends TableSchema>({ table, schema, defaults, onSuccess, children }: {
     table: string
     schema: TSchema
     defaults?: Partial<z.infer<TSchema['writable']>>
@@ -193,7 +193,7 @@ export function CreateForm<TSchema extends TableSchema>({ table, defaults, onSuc
     type Readable = z.infer<TSchema['readable']>
     type Writable = z.infer<TSchema['writable']>
 
-    const { create } = useTableInterface<TSchema>(table)
+    const { create } = useTableInterface<TSchema>(table, schema)
 
     const callback = useCallback(
         async (fields: Writable) => {
@@ -241,7 +241,7 @@ export function UpdateForm<TSchema extends TableSchema>({
     type Readable = z.infer<TSchema['readable']>
     type Writable = z.infer<TSchema['writable']>
 
-    const { update } = useTableInterface<TSchema>(table)
+    const { update } = useTableInterface<TSchema>(table, schema)
 
     const callback = useCallback(
         async (fields: Partial<Writable>) => {
@@ -288,7 +288,7 @@ export function FilterForm<TSchema extends TableSchema>({
 }) {
     type Readable = z.infer<TSchema['readable']>
 
-    const { list } = useTableInterface<TSchema>(table)
+    const { list } = useTableInterface<TSchema>(table, schema)
 
     const callback = useCallback(
         async (fields: Omit<ListProps<Readable>, 'table'>) => {
@@ -348,24 +348,23 @@ export function useFiltersForm <TSchema extends TableSchema>(schema: TSchema) {
 export function useSingleProvider<TSchema extends TableSchema>({
     id,
     table,
+    schema,
 }: {
     id: string
     table: string
+    schema: TSchema
 }) {
-    const { find } = useTableInterface(table)
-    const { index } = useTableIndex<TSchema>(table)
-    const [single, setSingle] = useState<TSchema['readable']>(
-        // @ts-expect-error
-        () => index[id as keyof typeof index]
+    const { find } = useTableInterface(table, schema)
+    const { index } = useTableIndex<TSchema>(table, schema)
+    const [single, setSingle] = useState<z.infer<TSchema['readable']>>(
+        () => index[table][id as keyof typeof index]
     )
     useEffect(() => {
-        // @ts-expect-error
         if (!single) find.trigger({ id }).then(setSingle)
     }, [])
     useEffect(() => {
-        // @ts-expect-error
-        setSingle(index[id as keyof typeof index])
-    }, [index[id as keyof typeof index]])
+        setSingle(index[table][id as keyof typeof index])
+    }, [index[table][id as keyof typeof index]])
     return {
         id,
         single,
@@ -378,15 +377,16 @@ export const SingleContext = createContext<
     ReturnType<typeof useSingleProvider> | undefined
 >(undefined)
 
-export function SingleProvider<T>({
+export function SingleProvider<TSchema extends TableSchema>({
     children,
     ...props
 }: {
     id: string
     table: string
-    children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider>) => React.ReactNode)
+    schema: TSchema
+    children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider<TSchema>>) => React.ReactNode)
 }) {
-    const value = useSingleProvider(props)
+    const value = useSingleProvider<TSchema>(props)
     if (!value.single) return null
     return (
         <SingleContext.Provider value={value}>
