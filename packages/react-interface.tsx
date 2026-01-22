@@ -389,6 +389,7 @@ export function SingleProvider<TSchema extends TableSchema>({
     const value = useSingleProvider<TSchema>(props)
     if (!value.single) return null
     return (
+        // @ts-expect-error
         <SingleContext.Provider value={value}>
             {typeof children === 'function' ? (
                 children(value)
@@ -400,5 +401,6 @@ export function SingleProvider<TSchema extends TableSchema>({
 }
 
 export function useSingle<TSchema extends TableSchema>() {
+    // @ts-expect-error
     return useContext(SingleContext) as ReturnType<typeof useSingleProvider<TSchema>>
 }
