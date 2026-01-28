@@ -573,7 +573,7 @@ const messagesInterface = tableInterface(messageSchema, 'messages', {
   find: firestoreInterface.find,
   list: firestoreInterface.list,
 })
-
+```
 
 ### Key Principles
 
