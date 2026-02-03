@@ -1,7 +1,7 @@
 {
   "name": "asasvirtuais",
   "type": "module",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "description": "React form and action management utilities",
   "directories": {
     "packages": "./packages"
@@ -32,8 +32,8 @@
       "default": "./packages/hooks.tsx"
     },
     "./interface": {
-      "types": "./packages/interface/interface.ts",
-      "default": "./packages/interface/interface.ts"
+      "types": "./packages/interface.ts",
+      "default": "./packages/interface.ts"
     },
     "./react-interface": {
       "types": "./packages/react-interface.tsx",

@@ -673,6 +673,196 @@ Give AI the asasvirtuais documentation and watch it generate multi-step forms wi
 Try it with [Google AI Studio](https://ai.studio/apps/drive/1-MwQzpbgMZhRqSbpqQYX1IRpvj61F_l8).
 
 
+# Model Package Instructions
+
+A model package is a self-contained module that defines a data model and provides React components for interacting with that data. Based on the chat example, here's how to structure a model package:
+
+## File Structure
+
+```
+app/[model-name]/
+├── index.ts          # Schema definitions and types
+├── fields.tsx        # Individual form field components
+├── forms.tsx         # Complete form components
+└── table.tsx         # Provider and hooks for data access
+```
+
+## 1. Schema Definition (`index.ts`)
+
+Define your data model using Zod schemas:
+
+```typescript
+import z from 'zod'
+
+// Define the complete object structure (what comes from the database)
+export const readable = z.object({
+    id: z.string(),
+    // ... other fields that can be read
+})
+
+// Define which fields can be written/modified
+export const writable = readable.pick({
+    // ... fields that can be created/updated
+})
+
+// Export the schema object
+export const schema = { readable, writable }
+
+// Export TypeScript types
+export type Readable = z.infer<typeof readable>
+export type Writable = z.infer<typeof writable>
+```
+
+**Key Points:**
+- `readable`: Full object schema including `id` and all readable fields
+- `writable`: Subset of fields that users can create/modify (typically excludes `id`)
+- Use `.pick()` to select fields from readable for writable
+- Export both the schema object and TypeScript types
+
+## 2. Field Components (`fields.tsx`)
+
+Create reusable field components for individual form inputs:
+
+```typescript
+import { Input, InputProps } from '@chakra-ui/react'
+import { useFields } from 'asasvirtuais/fields'
+
+export function [FieldName]Field(props: InputProps) {
+    const { fields, setField } = useFields<{fieldName: type}>()
+    
+    return (
+        <Input 
+            name='fieldName' 
+            value={fields.fieldName} 
+            onChange={e => setField('fieldName', e.target.value)} 
+            {...props} 
+        />
+    )
+}
+```
+
+**Key Points:**
+- Use `useFields` hook with type annotation matching your field
+- Pass through additional props using spread operator
+- Set appropriate `name` attribute
+- Handle `onChange` with `setField`
+
+## 3. Form Components (`forms.tsx`)
+
+Create complete forms for creating and filtering data:
+
+```typescript
+import { CreateForm, FilterForm, useTableInterface } from 'asasvirtuais/react-interface'
+import { schema } from '.'
+import { [Field]Field } from './fields'
+import { Stack, Button } from '@chakra-ui/react'
+
+// Create form
+export function Create[Model]() {
+    return (
+        <CreateForm table='tableName' schema={schema}>
+            {form => (
+                <Stack as='form' onSubmit={form.submit}>
+                    <[Field]Field />
+                    <Button type='submit'>Create [Model]</Button>
+                </Stack>
+            )}
+        </CreateForm>
+    )
+}
+
+// Filter/List form
+export function Filter[Models]() {
+    const { remove } = useTableInterface('tableName', schema)
+    
+    return (
+        <FilterForm table='tableName' schema={schema}>
+            {form => (
+                <Stack>
+                    {form.result?.map(item => (
+                        <div key={item.id}>
+                            {/* Display item data */}
+                            <Button onClick={() => remove.trigger({id: item.id})}>
+                                Delete
+                            </Button>
+                        </div>
+                    ))}
+                </Stack>
+            )}
+        </FilterForm>
+    )
+}
+```
+
+**Key Points:**
+- `CreateForm` handles creation logic, provides `form.submit`
+- `FilterForm` provides `form.result` with filtered data
+- Use `useTableInterface` for operations like `remove`
+- Always provide `table` name and `schema` to forms
+
+## 4. Provider and Hooks (`table.tsx`)
+
+Set up the data provider and custom hooks:
+
+```typescript
+'use client'
+import { TableProvider, useTableInterface } from 'asasvirtuais/react-interface'
+import { fetchInterface } from 'asasvirtuais/fetch-interface'
+import { schema } from '.'
+
+export function use[Models]() {
+    return useTableInterface<typeof schema>('tableName')
+}
+
+export function [Models]Provider({ children }: { children: React.ReactNode }) {
+    return (
+        <TableProvider 
+            table='tableName' 
+            schema={schema} 
+            interface={fetchInterface({
+                schema, 
+                baseUrl: '/api/v1', 
+                defaultTable: 'tableName'
+            })}
+        >
+            {children}
+        </TableProvider>
+    )
+}
+```
+
+**Key Points:**
+- Mark as `'use client'` for Next.js
+- Create a custom hook for easy access to table interface
+- Provide `fetchInterface` configuration with baseUrl and table name
+- Wrap your app/components with the Provider to enable data access
+
+## Naming Conventions
+
+- **Model name**: Singular (e.g., `chat`, `user`, `product`)
+- **Table name**: Plural (e.g., `chats`, `users`, `products`)
+- **Field components**: `[Field]Field` (e.g., `TitleField`, `EmailField`)
+- **Form components**: `Create[Model]`, `Filter[Models]` (e.g., `CreateChat`, `FilterChats`)
+- **Provider**: `[Models]Provider` (e.g., `ChatsProvider`)
+- **Hook**: `use[Models]` (e.g., `useChats`)
+
+## Usage Example
+
+```typescript
+import { ChatsProvider } from './chat/table'
+import { CreateChat, FilterChats } from './chat/forms'
+
+function App() {
+    return (
+        <ChatsProvider>
+            <CreateChat />
+            <FilterChats />
+        </ChatsProvider>
+    )
+}
+```
+
+
 ## Contributing
 
 This is the result of years of meditation on overengineering. If you see ways to make it simpler (not more feature-rich, simpler), I'm interested.
