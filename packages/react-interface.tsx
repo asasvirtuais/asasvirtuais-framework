@@ -18,17 +18,6 @@ export function useDatabaseProvider() {
 
 export const [DatabaseProvider, useDatabase] = createContextFromHook(useDatabaseProvider)
 
-export function useTableInterface<TSchema extends TableSchema>(table: string, schema: TSchema) {
-    const { interfaces } = useDatabase()
-
-    const module = interfaces[table] as ReturnType<typeof useTableProvider<TSchema>> | undefined
-
-    if (!module)
-        throw new Error(`Table "${table}" is not defined in the database schema.`)
-
-    return module
-}
-
 export type TableProviderProps<TSchema extends TableSchema> = {
     table: string
     schema: TSchema
@@ -117,7 +106,7 @@ export function CreateForm<TSchema extends TableSchema>({ table, schema, default
     type Readable = z.infer<TSchema['readable']>
     type Writable = z.infer<TSchema['writable']>
 
-    const { create } = useTableInterface<TSchema>(table, schema)
+    const { create } = useTable<TSchema>(table, schema)
 
     const callback = useCallback(
         async (fields: Writable) => {
@@ -165,7 +154,7 @@ export function UpdateForm<TSchema extends TableSchema>({
     type Readable = z.infer<TSchema['readable']>
     type Writable = z.infer<TSchema['writable']>
 
-    const { update } = useTableInterface<TSchema>(table, schema)
+    const { update } = useTable<TSchema>(table, schema)
 
     const callback = useCallback(
         async (fields: Partial<Writable>) => {
@@ -212,7 +201,7 @@ export function FilterForm<TSchema extends TableSchema>({
 }) {
     type Readable = z.infer<TSchema['readable']>
 
-    const { list } = useTableInterface<TSchema>(table, schema)
+    const { list } = useTable<TSchema>(table, schema)
 
     const callback = useCallback(
         async (fields: Omit<ListProps<Readable>, 'table'>) => {
@@ -278,7 +267,7 @@ export function useSingleProvider<TSchema extends TableSchema>({
     table: string
     schema: TSchema
 }) {
-    const { find, index } = useTableInterface(table, schema)
+    const { find, index } = useTable(table, schema)
     const [single, setSingle] = useState<z.infer<TSchema['readable']>>(
         // @ts-expect-error
         () => index[table][id]
