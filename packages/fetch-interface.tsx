@@ -1,20 +1,17 @@
 'use client'
 import { z } from 'zod'
 import { useMemo } from 'react'
-import { createContextFromHook } from './hooks'
 import type { TableInterface, TableSchema } from './interface'
+import { InterfaceProvider } from './interface-provider'
 
-export function useFetchInterfaceProvider<TSchema extends TableSchema>({
-  schema, baseUrl = '/api/v1', headers = {},
-}: {
-  schema: TSchema
-  baseUrl?: string
-  headers?: Record<string, string>
-}) {
-  return useMemo(() => fetchInterface({ schema, baseUrl, headers }), [schema, baseUrl])
+export function FetchInterfaceProvider<Schema extends TableSchema>({ schema, defaultTable, baseUrl, headers, children }: { schema: Schema, defaultTable?: string, baseUrl?: string, headers?: Record<string, string>, children: React.ReactNode }) {
+    const memo = useMemo(() => fetchInterface({ schema, defaultTable, baseUrl, headers }), [schema, defaultTable, baseUrl, headers])
+    return (
+        <InterfaceProvider interface={memo}>
+          {children}
+        </InterfaceProvider>
+    )
 }
-
-export const [FetchInterfaceProvider, useFetchInterface] = createContextFromHook(useFetchInterfaceProvider<any>)
 
 export function fetchInterface<Schema extends TableSchema, Table extends string>({
   schema, defaultTable, baseUrl = '/api/v1', headers = {}

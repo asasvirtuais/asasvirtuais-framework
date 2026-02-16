@@ -2,19 +2,19 @@
 import Dexie from 'dexie'
 import { z } from 'zod'
 import { useMemo } from 'react'
-import { createContextFromHook } from './hooks'
-import type { DatabaseSchema, TableInterface } from './interface'
+import type { DatabaseSchema, TableInterface, TableSchema } from './interface'
+import { InterfaceProvider } from './interface-provider'
 
-export function useIndexedInterfaceProvider<Schema extends DatabaseSchema>({
-    dbName, schema,
-}: {
-    dbName: string
-    schema: Schema
-}) {
-    return useMemo(() => indexedInterface(dbName, schema), [dbName, schema])
+export function IndexedInterfaceProvider<Schema extends DatabaseSchema>({ dbName, schema, children }: { dbName: string, schema: Schema, children: React.ReactNode }) {
+
+    const memo = useMemo(() => indexedInterface(dbName, schema), [dbName, schema])
+
+    return (
+        <InterfaceProvider interface={memo}>
+            {children}
+        </InterfaceProvider>
+    )
 }
-
-export const [IndexedInterfaceProvider, useIndexedInterface] = createContextFromHook(useIndexedInterfaceProvider<any>)
 
 /**
  * Creates a TableInterface adapter for IndexedDB using Dexie.js.

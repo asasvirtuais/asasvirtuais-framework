@@ -1,17 +1,16 @@
 'use client'
 import { useMemo } from 'react'
-import { createContextFromHook } from './hooks'
 import type { TableInterface, TableSchema } from './interface'
+import { InterfaceProvider } from './interface-provider'
 
-export function useMemInterfaceProvider<TSchema extends TableSchema>({
-    schema,
-}: {
-    schema: TSchema
-}) {
-    return useMemo(() => memInterface<TSchema>(), [schema])
+export function MemInterfaceProvider<TSchema extends TableSchema>({ children }: { children: React.ReactNode }) {
+    const memo = useMemo(() => memInterface<TSchema>(), [])
+    return (
+        <InterfaceProvider interface={memo}>
+            {children}
+        </InterfaceProvider>
+    )
 }
-
-export const [MemInterfaceProvider, useMemInterface] = createContextFromHook(useMemInterfaceProvider<any>)
 
 export function memInterface<TSchema extends TableSchema>(): TableInterface<any, any> {
 
