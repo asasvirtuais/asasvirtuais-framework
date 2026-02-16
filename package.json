@@ -1,7 +1,7 @@
 {
   "name": "asasvirtuais",
   "type": "module",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "React form and action management utilities",
   "directories": {
     "packages": "./packages"
