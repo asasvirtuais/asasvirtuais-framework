@@ -31,19 +31,6 @@ export function indexedInterface<Schema extends DatabaseSchema>(
 
     const db = new Dexie(dbName)
 
-    // Dynamically define the database schema for Dexie from the Zod schema.
-    // It marks 'id' as the primary key and indexes all other top-level readable fields.
-    const dexieSchema = Object.fromEntries(
-        Object.keys(schema).map(tableName => {
-            const fields = Object.keys(schema[tableName].readable.shape)
-            // 'id' is the primary key, the rest are indexed fields.
-            const indexedFields = fields.filter(f => f !== 'id').join(', ')
-            return [tableName, `id, ${indexedFields}`]
-        })
-    )
-
-    db.version(1).stores(dexieSchema)
-
     type GenericReadable = z.infer<Schema[keyof Schema]['readable']>
     type GenericWritable = z.infer<Schema[keyof Schema]['writable']>
 
