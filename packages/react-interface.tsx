@@ -269,16 +269,14 @@ export function useSingleProvider<TSchema extends TableSchema>({
 }) {
     const { find, index } = useTable(table, schema)
     const [single, setSingle] = useState<z.infer<TSchema['readable']>>(
-        // @ts-expect-error
-        () => index[table][id]
+        () => index[id]
     )
     useEffect(() => {
         if (!single) find.trigger({ id }).then(setSingle)
     }, [])
     useEffect(() => {
-        // @ts-expect-error
-        setSingle(index[table][id as keyof typeof index])
-    }, [index[table][id as keyof typeof index]])
+        setSingle(index[id])
+    }, [index[id]])
     return {
         id,
         single,
