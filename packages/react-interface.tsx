@@ -186,12 +186,14 @@ export function FilterForm<TSchema extends TableSchema>({
     schema,
     table,
     defaults,
+    autoTrigger,
     onSuccess,
     children,
 }: {
     schema: TSchema
     table: string
     defaults?: Partial<ListProps<z.infer<TSchema['readable']>>>
+    autoTrigger?: boolean
     onSuccess?: (result: z.infer<TSchema['readable']>[]) => void
     children: React.ReactNode | (
         (props: ReturnType<typeof useActionProvider<ListProps<z.infer<TSchema['readable']>>, z.infer<TSchema['readable']>[]>>
@@ -217,7 +219,7 @@ export function FilterForm<TSchema extends TableSchema>({
             defaults={(defaults || { query: {} }) as ListProps<Readable>}
         >
             {fields => (
-                <ActionProvider<ListProps<Readable>, Readable[]> action={callback} params={fields.fields}>
+                <ActionProvider<ListProps<Readable>, Readable[]> action={callback} params={fields.fields} autoTrigger={autoTrigger}>
                     {typeof children === 'function' ? (
                         form => children({ ...form, ...fields })
                     ) : (
@@ -249,7 +251,7 @@ export function useUpdateForm<TSchema extends TableSchema>(schema: TSchema) {
     }
 }
 
-export function useFiltersForm<TSchema extends TableSchema>(schema: TSchema) {
+export function useFilterForm<TSchema extends TableSchema>(schema: TSchema) {
     return {
         ...useFields<z.infer<TSchema['readable']>>(),
         ...useAction<z.infer<TSchema['readable']>,
