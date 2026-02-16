@@ -228,37 +228,42 @@ export const userSchema = {
 }
 ```
 
-#### 2. Create Your Table Interface
-
-```typescript
-// app/interface.ts
-import { fetchInterface } from '@asasvirtuais/fetch-interface'
-import { todoSchema } from './database'
-
-// Create interface for your API
-export const todosInterface = fetchInterface({
-  schema: todoSchema,
-  defaultTable: 'todos',
-  baseUrl: '/api/v1'
-})
-```
-
-#### 3. Provide Table Context
+#### 2. Provide the Interface Context
 
 ```tsx
-// app/todos/layout.tsx
-import { TableProvider } from '@asasvirtuais/react-interface'
-import { todoSchema, todosInterface } from '@/app/interface'
+// app/layout.tsx
+import { InterfaceProvider } from 'asasvirtuais/fetch-interface'
+import { DatabaseProvider, TableProvider } from 'asasvirtuais/react-interface'
+import { todoSchema } from './database'
 
-export default async function TodosLayout({ children }) {
-  const initialTodos = await fetchTodos()
-  
+export default function RootLayout({ children }) {
+  return (
+    <DatabaseProvider>
+      <InterfaceProvider schema={todoSchema} baseUrl='/api/v1'>
+        <TodosProvider>
+          {children}
+        </TodosProvider>
+      </InterfaceProvider>
+    </DatabaseProvider>
+  )
+}
+```
+
+#### 3. Create Your Table Provider
+
+```tsx
+// app/todos/provider.tsx
+'use client'
+import { TableProvider } from 'asasvirtuais/react-interface'
+import { useInterface } from 'asasvirtuais/fetch-interface'
+import { todoSchema } from './database'
+
+export function TodosProvider({ children }) {
   return (
     <TableProvider
-      table="todos"
+      table='todos'
       schema={todoSchema}
-      interface={todosInterface}
-      asAbove={initialTodos}
+      interface={useInterface()}
     >
       {children}
     </TableProvider>
@@ -802,28 +807,24 @@ export function Filter[Models]() {
 
 ## 4. Provider and Hooks (`table.tsx`)
 
-Set up the data provider and custom hooks:
+Set up the data provider and custom hooks using `InterfaceProvider` and `useInterface`:
 
 ```typescript
 'use client'
 import { TableProvider, useTableInterface } from 'asasvirtuais/react-interface'
-import { fetchInterface } from 'asasvirtuais/fetch-interface'
+import { useInterface } from 'asasvirtuais/fetch-interface'
 import { schema } from '.'
 
 export function use[Models]() {
-    return useTableInterface<typeof schema>('tableName')
+    return useTableInterface('tableName', schema)
 }
 
 export function [Models]Provider({ children }: { children: React.ReactNode }) {
     return (
-        <TableProvider 
-            table='tableName' 
-            schema={schema} 
-            interface={fetchInterface({
-                schema, 
-                baseUrl: '/api/v1', 
-                defaultTable: 'tableName'
-            })}
+        <TableProvider
+            table='tableName'
+            schema={schema}
+            interface={useInterface()}
         >
             {children}
         </TableProvider>
@@ -831,11 +832,28 @@ export function [Models]Provider({ children }: { children: React.ReactNode }) {
 }
 ```
 
+Then in your layout, wrap with `InterfaceProvider` to set up the context:
+
+```tsx
+import { InterfaceProvider } from 'asasvirtuais/fetch-interface'
+import { DatabaseProvider } from 'asasvirtuais/react-interface'
+import { [Models]Provider } from './table'
+import { schema } from '.'
+
+<DatabaseProvider>
+  <InterfaceProvider schema={schema} baseUrl='/api/v1'>
+    <[Models]Provider>
+      {children}
+    </[Models]Provider>
+  </InterfaceProvider>
+</DatabaseProvider>
+```
+
 **Key Points:**
-- Mark as `'use client'` for Next.js
+- Mark table.tsx as `'use client'` for Next.js
+- `InterfaceProvider` creates the fetch interface and provides it via context
+- `useInterface()` retrieves the interface from context inside `TableProvider`
 - Create a custom hook for easy access to table interface
-- Provide `fetchInterface` configuration with baseUrl and table name
-- Wrap your app/components with the Provider to enable data access
 
 ## Naming Conventions
 

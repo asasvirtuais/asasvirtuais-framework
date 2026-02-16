@@ -175,8 +175,13 @@ export function TableProvider<TSchema extends TableSchema>({children, ...props}:
     )
 }
 
-export function useTable<TSchema extends TableSchema>() {
-    return useContext(TableContext) as ReturnType<typeof useTableProvider<TSchema>>
+export function useTable<TSchema extends TableSchema>(table: string, schema: TSchema) {
+    const methods = useTableInterface(table, schema)
+    const index = useTableIndex(table, schema)
+    return {
+        ...methods,
+        ...index,
+    }
 }
 
 export function CreateForm<TSchema extends TableSchema>({ table, schema, defaults, onSuccess, children }: {

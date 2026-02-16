@@ -11,6 +11,9 @@ importers:
       '@chakra-ui/react':
         specifier: ^3.30.0
         version: 3.30.0(@emotion/react@11.14.0(@types/react@19.2.8)(react@19.2.3))(react-dom@18.3.1(react@19.2.3))(react@19.2.3)
+      dexie:
+        specifier: ^4.3.0
+        version: 4.3.0
       next:
         specifier: ^16.1.1
         version: 16.1.1(react-dom@18.3.1(react@19.2.3))(react@19.2.3)
@@ -925,6 +928,9 @@ packages:
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
+
+  dexie@4.3.0:
+    resolution: {integrity: sha512-5EeoQpJvMKHe6zWt/FSIIuRa3CWlZeIl6zKXt+Lz7BU6RoRRLgX9dZEynRfXrkLcldKYCBiz7xekTEylnie1Ug==}
 
   doctrine@3.0.0:
     resolution: {integrity: sha512-yS+Q5i3hBf7GBkd4KG8a7eBNNWNGLTaEwwYWUijIYM7zrlYDM0BFXHjjPWlWZ1Rg7UaddZeIDmi9jF3HmqiQ2w==}
@@ -2728,6 +2734,8 @@ snapshots:
 
   detect-libc@2.1.2:
     optional: true
+
+  dexie@4.3.0: {}
 
   doctrine@3.0.0:
     dependencies:

@@ -4,12 +4,12 @@ import { fetchInterface } from 'asasvirtuais/fetch-interface'
 import { schema } from '.'
 
 export function useChats() {
-    return useTableInterface<typeof schema>('chats')
+    return useTableInterface('chats', schema)
 }
 
 export function ChatsProvider({ children }: { children: React.ReactNode }) {
     return (
-        <TableProvider table='chats' schema={schema} interface={fetchInterface({schema, 'baseUrl': '/api/v1', defaultTable: 'chats'})}>
+        <TableProvider table='chats' schema={schema} interface={fetchInterface({ schema, 'baseUrl': '/api/v1', defaultTable: 'chats' })}>
             {children}
         </TableProvider>
     )
