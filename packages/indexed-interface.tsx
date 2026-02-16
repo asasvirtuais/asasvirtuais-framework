@@ -31,7 +31,7 @@ export function indexedInterface<Schema extends DatabaseSchema>(
 
     const db = new Dexie(dbName)
 
-    
+
     // Dynamically define the database schema for Dexie from the Zod schema.
     // It marks 'id' as the primary key and indexes all other top-level readable fields.
     const dexieSchema = Object.fromEntries(
@@ -49,7 +49,7 @@ export function indexedInterface<Schema extends DatabaseSchema>(
     type GenericReadable = z.infer<Schema[keyof Schema]['readable']>
     type GenericWritable = z.infer<Schema[keyof Schema]['writable']>
 
-    return {
+    const methods = {
         async find({ table, id }) {
             if (!table) throw new Error('Table name must be provided.')
             const result = await db.table(table).get(id)
@@ -124,13 +124,13 @@ export function indexedInterface<Schema extends DatabaseSchema>(
             if (updatedCount === 0) {
                 throw new Error(`Record with id ${id} not found in ${table}, cannot update.`)
             }
-            const result = await this.find({ table, id })
+            const result = await methods.find({ table, id })
             return result as GenericReadable
         },
 
         async remove({ table, id }) {
             if (!table) throw new Error('Table name must be provided.')
-            const record = await this.find({ table, id })
+            const record = await methods.find({ table, id })
             if (!record) {
                 throw new Error(`Record with id ${id} not found in ${table}, cannot remove.`)
             }
@@ -138,4 +138,6 @@ export function indexedInterface<Schema extends DatabaseSchema>(
             return record as GenericReadable
         },
     } as TableInterface<GenericReadable, GenericWritable>
+
+    return methods
 }
