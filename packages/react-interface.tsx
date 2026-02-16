@@ -89,6 +89,16 @@ export function TableProvider<TSchema extends TableSchema>({ children, ...props 
     )
 }
 
+export function TableConsumer<TSchema extends TableSchema>({ children }: { children: React.ReactNode | ((props: ReturnType<typeof useTableProvider<TSchema>>) => React.ReactNode) }) {
+    const context = useContext(TableContext)
+    if (!context) throw new Error('TableConsumer must be used within a TableProvider.')
+    return (
+        <>
+            {typeof children === 'function' ? children(context) : children}
+        </>
+    )
+}
+
 export function useTable<TSchema extends TableSchema>(table: string, schema: TSchema) {
     return useContext(TableContext) as ReturnType<typeof useTableProvider<TSchema>>
 }
