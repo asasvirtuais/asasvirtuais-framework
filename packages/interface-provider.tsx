@@ -2,9 +2,7 @@
 import { createContextFromHook } from './hooks'
 import type { TableInterface } from './interface'
 
-function useInterfaceProvider({ interface: tableInterface }: {
-    interface: TableInterface<any, any>
-}) {
+function useInterfaceProvider(tableInterface: TableInterface<any, any>) {
     return tableInterface
 }
 

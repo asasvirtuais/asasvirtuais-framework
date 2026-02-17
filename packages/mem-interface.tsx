@@ -1,16 +1,5 @@
 'use client'
-import { useMemo } from 'react'
 import type { TableInterface, TableSchema } from './interface'
-import { InterfaceProvider } from './interface-provider'
-
-export function MemInterfaceProvider<TSchema extends TableSchema>({ children }: { children: React.ReactNode }) {
-    const memo = useMemo(() => memInterface<TSchema>(), [])
-    return (
-        <InterfaceProvider interface={memo}>
-            {children}
-        </InterfaceProvider>
-    )
-}
 
 export function memInterface<TSchema extends TableSchema>(): TableInterface<any, any> {
 

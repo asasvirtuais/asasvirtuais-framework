@@ -1,17 +1,5 @@
-'use client'
 import { z } from 'zod'
-import { useMemo } from 'react'
 import type { TableInterface, TableSchema } from './interface'
-import { InterfaceProvider } from './interface-provider'
-
-export function FetchInterfaceProvider<Schema extends TableSchema>({ schema, defaultTable, baseUrl, headers, children }: { schema: Schema, defaultTable?: string, baseUrl?: string, headers?: Record<string, string>, children: React.ReactNode }) {
-    const memo = useMemo(() => fetchInterface({ schema, defaultTable, baseUrl, headers }), [schema, defaultTable, baseUrl, headers])
-    return (
-        <InterfaceProvider interface={memo}>
-          {children}
-        </InterfaceProvider>
-    )
-}
 
 export function fetchInterface<Schema extends TableSchema, Table extends string>({
   schema, defaultTable, baseUrl = '/api/v1', headers = {}
