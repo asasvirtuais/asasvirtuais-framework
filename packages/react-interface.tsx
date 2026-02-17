@@ -65,22 +65,28 @@ export function useTableProvider<TSchema extends TableSchema>({
     }
 }
 
-const TableContext = createContext<ReturnType<typeof useTableProvider<any>> | undefined>(undefined)
+const TableRegistryContext = createContext<Record<string, ReturnType<typeof useTableProvider<any>>> | undefined>(undefined)
 
 export function TableProvider<TSchema extends TableSchema>({ children, ...props }: React.PropsWithChildren<TableProviderProps<TSchema>>) {
 
     const context = useTableProvider(props)
+    const registry = useContext(TableRegistryContext) ?? {}
+
+    const newRegistry = useMemo(() => {
+        return { ...registry, [props.table]: context }
+    }, [registry, props.table, context])
 
     return (
-        <TableContext.Provider value={context}>
+        <TableRegistryContext.Provider value={newRegistry}>
             {children}
-        </TableContext.Provider>
+        </TableRegistryContext.Provider>
     )
 }
 
 export function TableConsumer<TSchema extends TableSchema>({ children }: { children: React.ReactNode | ((props: ReturnType<typeof useTableProvider<TSchema>>) => React.ReactNode) }) {
-    const context = useContext(TableContext)
-    if (!context) throw new Error('TableConsumer must be used within a TableProvider.')
+    const registry = useContext(TableRegistryContext)
+    if (!registry || Object.keys(registry).length === 0) throw new Error('TableConsumer must be used within a TableProvider.')
+    const context = Object.values(registry)[0]
     return (
         <>
             {typeof children === 'function' ? children(context) : children}
@@ -89,7 +95,9 @@ export function TableConsumer<TSchema extends TableSchema>({ children }: { child
 }
 
 export function useTable<TSchema extends TableSchema>(table: string, schema: TSchema) {
-    return useContext(TableContext) as ReturnType<typeof useTableProvider<TSchema>>
+    const registry = useContext(TableRegistryContext)
+    if (!registry || !registry[table]) throw new Error(`useTable("${table}") must be used within a TableProvider for that table.`)
+    return registry[table] as ReturnType<typeof useTableProvider<TSchema>>
 }
 
 export function CreateForm<TSchema extends TableSchema>({ table, schema, defaults, onSuccess, children }: {
