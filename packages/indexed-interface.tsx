@@ -10,7 +10,7 @@ export function IndexedInterfaceProvider<Schema extends DatabaseSchema>({ dbName
     const memo = useMemo(() => indexedInterface(dbName, schema), [dbName, schema])
 
     return (
-        <InterfaceProvider interface={memo}>
+        <InterfaceProvider {...memo}>
             {children}
         </InterfaceProvider>
     )
