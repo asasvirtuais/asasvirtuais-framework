@@ -276,11 +276,11 @@ export function TodosProvider({ children }) {
 ```tsx
 // app/todos/page.tsx
 'use client'
-import { useDatabaseTable, CreateForm } from '@asasvirtuais/react-interface'
+import { useTable, CreateForm } from '@asasvirtuais/react-interface'
 import { todoSchema } from '@/app/database'
 
 function TodoList() {
-  const { index, remove, update } = useDatabaseTable('todos')
+  const { index, remove, update } = useTable('todos', todoSchema)
   const todos = Object.values(index.index)
 
   return (
@@ -356,8 +356,8 @@ export default async function RootLayout({ children }) {
 
 // Now any component can access tables:
 function MyComponent() {
-  const todos = useDatabaseTable('todos')
-  const users = useDatabaseTable('users')
+  const todos = useTable('todos', todoSchema)
+  const users = useTable('users', userSchema)
   // ...
 }
 ```
