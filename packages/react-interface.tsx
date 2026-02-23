@@ -289,15 +289,14 @@ export function useSingleProvider<TSchema extends TableSchema>({
     }, [index[id]])
     return {
         id,
+        table,
         single,
         setSingle,
         loading: find.loading,
     }
 }
 
-export const SingleContext = createContext<
-    ReturnType<typeof useSingleProvider> | undefined
->(undefined)
+const SingleRegistryContext = createContext<Record<string, ReturnType<typeof useSingleProvider<any>>> | undefined>(undefined)
 
 export function SingleProvider<TSchema extends TableSchema>({
     children,
@@ -310,20 +309,26 @@ export function SingleProvider<TSchema extends TableSchema>({
     nullIfNotFound?: boolean
 }) {
     const value = useSingleProvider<TSchema>(props)
+    const registry = useContext(SingleRegistryContext) ?? {}
+
+    const newRegistry = useMemo(() => {
+        return { ...registry, [props.table]: value }
+    }, [registry, props.table, value])
+
     if (props.nullIfNotFound && !value.single) return null
     return (
-        // @ts-expect-error
-        <SingleContext.Provider value={value}>
+        <SingleRegistryContext.Provider value={newRegistry}>
             {typeof children === 'function' ? (
                 children(value)
             ) : (
                 children
             )}
-        </SingleContext.Provider>
+        </SingleRegistryContext.Provider>
     )
 }
 
-export function useSingle<TSchema extends TableSchema>() {
-    // @ts-expect-error
-    return useContext(SingleContext) as ReturnType<typeof useSingleProvider<TSchema>>
+export function useSingle<TSchema extends TableSchema>(table: string, _schema: TSchema) {
+    const registry = useContext(SingleRegistryContext)
+    if (!registry || !registry[table]) throw new Error(`useSingle("${table}") must be used within a SingleProvider for that table.`)
+    return registry[table] as ReturnType<typeof useSingleProvider<TSchema>>
 }
