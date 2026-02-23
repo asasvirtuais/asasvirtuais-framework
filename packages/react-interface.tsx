@@ -307,9 +307,10 @@ export function SingleProvider<TSchema extends TableSchema>({
     table: string
     schema: TSchema
     children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider<TSchema>>) => React.ReactNode)
+    nullIfNotFound?: boolean
 }) {
     const value = useSingleProvider<TSchema>(props)
-    if (!value.single) return null
+    if (props.nullIfNotFound && !value.single) return null
     return (
         // @ts-expect-error
         <SingleContext.Provider value={value}>
