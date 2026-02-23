@@ -1,7 +1,7 @@
 {
   "name": "asasvirtuais",
   "type": "module",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "React form and action management utilities",
   "directories": {
     "packages": "./packages"
@@ -15,6 +15,10 @@
   ],
   "exports": {
     "./package.json": "./package.json",
+    "./auth0": {
+      "types": "./packages/auth0.ts",
+      "default": "./packages/auth0.ts"
+    },
     "./action": {
       "types": "./packages/action.tsx",
       "default": "./packages/action.tsx"
