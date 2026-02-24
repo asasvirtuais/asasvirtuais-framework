@@ -232,18 +232,18 @@ export const userSchema = {
 
 ```tsx
 // app/layout.tsx
-import { InterfaceProvider } from 'asasvirtuais/fetch-interface'
+import { FetchInterfaceProvider } from 'asasvirtuais/fetch-interface'
 import { DatabaseProvider, TableProvider } from 'asasvirtuais/react-interface'
 import { todoSchema } from './database'
 
 export default function RootLayout({ children }) {
   return (
     <DatabaseProvider>
-      <InterfaceProvider schema={todoSchema} baseUrl='/api/v1'>
+      <FetchInterfaceProvider schema={todoSchema} baseUrl='/api/v1'>
         <TodosProvider>
           {children}
         </TodosProvider>
-      </InterfaceProvider>
+      </FetchInterfaceProvider>
     </DatabaseProvider>
   )
 }
@@ -259,11 +259,12 @@ import { useInterface } from 'asasvirtuais/fetch-interface'
 import { todoSchema } from './database'
 
 export function TodosProvider({ children }) {
+  const fetchInterface = useInterface()
   return (
     <TableProvider
       table='todos'
       schema={todoSchema}
-      interface={useInterface()}
+      interface={fetchInterface}
     >
       {children}
     </TableProvider>
