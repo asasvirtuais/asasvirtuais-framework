@@ -232,18 +232,18 @@ export const userSchema = {
 
 ```tsx
 // app/layout.tsx
-import { InterfaceProvider } from 'asasvirtuais/fetch-interface'
+import { FetchInterfaceProvider } from 'asasvirtuais/fetch-provider'
 import { DatabaseProvider, TableProvider } from 'asasvirtuais/react-interface'
 import { todoSchema } from './database'
 
 export default function RootLayout({ children }) {
   return (
     <DatabaseProvider>
-      <InterfaceProvider schema={todoSchema} baseUrl='/api/v1'>
+      <FetchInterfaceProvider schema={todoSchema} baseUrl='/api/v1'>
         <TodosProvider>
           {children}
         </TodosProvider>
-      </InterfaceProvider>
+      </FetchInterfaceProvider>
     </DatabaseProvider>
   )
 }
@@ -255,7 +255,7 @@ export default function RootLayout({ children }) {
 // app/todos/provider.tsx
 'use client'
 import { TableProvider } from 'asasvirtuais/react-interface'
-import { useInterface } from 'asasvirtuais/fetch-interface'
+import { useInterface } from 'asasvirtuais/interface-provider'
 import { todoSchema } from './database'
 
 export function TodosProvider({ children }) {
@@ -276,7 +276,7 @@ export function TodosProvider({ children }) {
 ```tsx
 // app/todos/page.tsx
 'use client'
-import { useTable, CreateForm } from '@asasvirtuais/react-interface'
+import { useTable, CreateForm } from 'asasvirtuais/react-interface'
 import { todoSchema } from '@/app/database'
 
 function TodoList() {
@@ -333,7 +333,7 @@ For apps with multiple tables, wrap them all in a DatabaseProvider:
 
 ```tsx
 // app/layout.tsx
-import { DatabaseProvider, TableProvider } from '@asasvirtuais/react-interface'
+import { DatabaseProvider, TableProvider } from 'asasvirtuais/react-interface'
 import { todoSchema, userSchema } from './database'
 import { todosInterface, usersInterface } from './interface'
 
@@ -360,6 +360,48 @@ function MyComponent() {
   const users = useTable('users', userSchema)
   // ...
 }
+```
+
+#### 6. Single Item Management
+
+When you need to focus on a single record (like a details page), use `SingleProvider` and `useSingle`:
+
+```tsx
+import { SingleProvider, useSingle } from 'asasvirtuais/react-interface'
+
+function ProfilePage({ userId }) {
+  return (
+    <SingleProvider id={userId} table="users" schema={userSchema}>
+      <UserProfile />
+    </SingleProvider>
+  )
+}
+
+function UserProfile() {
+  const { single: user, loading } = useSingle('users', userSchema)
+  
+  if (loading || !user) return <div>Loading...</div>
+  return <h1>{user.name}</h1>
+}
+```
+
+#### 7. Available Interfaces
+
+The framework provides multiple interface implementations for different environments:
+
+- **`fetchInterface`** (`asasvirtuais/fetch-provider`): Standard REST API client.
+- **`memInterface`** (`asasvirtuais/mem-provider`): In-memory storage, perfect for prototyping.
+- **`indexedInterface`** (`asasvirtuais/indexed-interface`): IndexedDB storage via Dexie for offline-first apps.
+- **`next-interface`**: Server-side Next.js route handlers.
+
+**Example Next.js API Route:**
+```typescript
+// app/api/v1/[...params]/route.ts
+import { createDynamicRoute } from 'asasvirtuais/next-interface'
+import { firestoreInterface } from '@/lib/firestore' // Your backend interface
+
+const handler = createDynamicRoute(firestoreInterface)
+export { handler as GET, handler as POST, handler as PATCH, handler as DELETE }
 ```
 
 ## Advanced Examples
@@ -432,7 +474,7 @@ In React, you control exactly when effects happen by writing code around form ac
 Run code before submission:
 
 ```tsx
-import { CreateForm } from '@asasvirtuais/react-interface'
+import { CreateForm } from 'asasvirtuais/react-interface'
 import { messageSchema } from '@/app/database'
 
 <CreateForm
@@ -527,7 +569,7 @@ On the backend, effects are just functions wrapping other functions. No framewor
 
 ```typescript
 // app/api/v1/[...params]/route.ts
-import { tableInterface } from '@asasvirtuais/interface'
+import { tableInterface } from 'asasvirtuais/interface'
 import { firestoreInterface } from '@/lib/firestore'
 import { messageSchema } from '@/app/database'
 
@@ -757,7 +799,7 @@ export function [FieldName]Field(props: InputProps) {
 Create complete forms for creating and filtering data:
 
 ```typescript
-import { CreateForm, FilterForm, useTableInterface } from 'asasvirtuais/react-interface'
+import { CreateForm, FilterForm, useTable } from 'asasvirtuais/react-interface'
 import { schema } from '.'
 import { [Field]Field } from './fields'
 import { Stack, Button } from '@chakra-ui/react'
@@ -778,7 +820,7 @@ export function Create[Model]() {
 
 // Filter/List form
 export function Filter[Models]() {
-    const { remove } = useTableInterface('tableName', schema)
+    const { remove } = useTable('tableName', schema)
     
     return (
         <FilterForm table='tableName' schema={schema}>
@@ -802,7 +844,7 @@ export function Filter[Models]() {
 **Key Points:**
 - `CreateForm` handles creation logic, provides `form.submit`
 - `FilterForm` provides `form.result` with filtered data
-- Use `useTableInterface` for operations like `remove`
+- Use `useTable` for operations like `remove`
 - Always provide `table` name and `schema` to forms
 
 ## 4. Provider and Hooks (`table.tsx`)
@@ -811,12 +853,12 @@ Set up the data provider and custom hooks using `InterfaceProvider` and `useInte
 
 ```typescript
 'use client'
-import { TableProvider, useTableInterface } from 'asasvirtuais/react-interface'
-import { useInterface } from 'asasvirtuais/fetch-interface'
+import { TableProvider, useTable } from 'asasvirtuais/react-interface'
+import { useInterface } from 'asasvirtuais/interface-provider'
 import { schema } from '.'
 
 export function use[Models]() {
-    return useTableInterface('tableName', schema)
+    return useTable('tableName', schema)
 }
 
 export function [Models]Provider({ children }: { children: React.ReactNode }) {
@@ -835,17 +877,17 @@ export function [Models]Provider({ children }: { children: React.ReactNode }) {
 Then in your layout, wrap with `InterfaceProvider` to set up the context:
 
 ```tsx
-import { InterfaceProvider } from 'asasvirtuais/fetch-interface'
+import { FetchInterfaceProvider } from 'asasvirtuais/fetch-provider'
 import { DatabaseProvider } from 'asasvirtuais/react-interface'
 import { [Models]Provider } from './table'
 import { schema } from '.'
 
 <DatabaseProvider>
-  <InterfaceProvider schema={schema} baseUrl='/api/v1'>
+  <FetchInterfaceProvider schema={schema} baseUrl='/api/v1'>
     <[Models]Provider>
       {children}
     </[Models]Provider>
-  </InterfaceProvider>
+  </FetchInterfaceProvider>
 </DatabaseProvider>
 ```
 
