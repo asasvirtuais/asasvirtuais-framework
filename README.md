@@ -259,11 +259,12 @@ import { useInterface } from 'asasvirtuais/interface-provider'
 import { todoSchema } from './database'
 
 export function TodosProvider({ children }) {
+  const fetchInterface = useInterface()
   return (
     <TableProvider
       table='todos'
       schema={todoSchema}
-      interface={useInterface()}
+      interface={fetchInterface}
     >
       {children}
     </TableProvider>
@@ -923,14 +924,523 @@ function App() {
 ```
 
 
-## Contributing
+---
 
-This is the result of years of meditation on overengineering. If you see ways to make it simpler (not more feature-rich, simpler), I'm interested.
+# @asasvirtuais/card
 
-## License
+A **model package** built on the `asasvirtuais` framework. This project is the canonical reference for how to create data-model packages that export reusable "lego blocks" — schema, fields, forms, display components, and a provider — all backend-agnostic and composable.
 
-MIT
+The included Next.js demo app shows a complete CRUD flow (List, Create, View/Edit, Delete) using IndexedDB for instant, serverless persistence.
 
 ---
 
-*Built by someone who spent 7 years learning that the hard way is usually the wrong way.*
+## Architecture Overview
+
+### Philosophy
+
+A **model package** encapsulates everything about a data model (e.g. "Card") into a self-contained, reusable module. It does **not** choose a storage backend — the consuming app does. This means the same package works against IndexedDB for prototyping, a REST API for production, or in-memory for tests, with zero changes.
+
+The framework provides **three categories of building blocks**:
+
+```
+┌─────────────────────────────────────┐
+│           Consumer App              │
+│  (Next.js, Vite, etc.)             │
+│                                     │
+│  ┌───────────────────────────────┐  │
+│  │     Backend Provider          │  │
+│  │  (IndexedDB / Fetch / Mem)    │  │
+│  │                               │  │
+│  │  ┌─────────────────────────┐  │  │
+│  │  │    Model Package        │  │  │
+│  │  │  (schema, fields,       │  │  │
+│  │  │   forms, components,    │  │  │
+│  │  │   provider)             │  │  │
+│  │  └─────────────────────────┘  │  │
+│  └───────────────────────────────┘  │
+└─────────────────────────────────────┘
+```
+
+1. **Primitives** (framework) — `Fields`, `Actions`, `Form`, context utilities
+2. **Interface layer** (framework) — `TableInterface` contract, `TableProvider`, `SingleProvider`, CRUD forms
+3. **Model package** (this project) — domain-specific schema, field components, forms, display components, provider
+
+### Framework Packages (`asasvirtuais`)
+
+| Import Path | Purpose |
+|---|---|
+| `asasvirtuais/interface` | Abstract `TableInterface<Readable, Writable>` contract with `find`, `create`, `update`, `remove`, `list` + query DSL (`$limit`, `$skip`, `$sort`, `$ne`, `$in`, `$gt`, etc.) |
+| `asasvirtuais/interface-provider` | `InterfaceProvider` + `useInterface()` — makes a `TableInterface` available via React context |
+| `asasvirtuais/react-interface` | `TableProvider`, `useTable`, `TableConsumer`, `SingleProvider`, `useSingle`, `CreateForm`, `UpdateForm`, `FilterForm` — the React layer that wires CRUD operations into reactive state |
+| `asasvirtuais/fields` | `FieldsProvider` + `useFields()` — generic field state management (get/set per field) |
+| `asasvirtuais/action` | `ActionProvider` + `useAction()` — wraps any async function with `loading`/`error`/`result`/`submit` state |
+| `asasvirtuais/form` | `Form` — composes `FieldsProvider` + `ActionProvider` |
+| `asasvirtuais/hooks` | `createContextFromHook`, `useAction`, `useIndex` — foundational utilities |
+| `asasvirtuais/indexed-interface` | `IndexedInterfaceProvider` — IndexedDB via Dexie.js (client-side persistence) |
+| `asasvirtuais/fetch-interface` | `FetchInterfaceProvider` — REST API backend |
+| `asasvirtuais/mem-interface` | `MemInterfaceProvider` — in-memory backend |
+
+---
+
+## Project Structure
+
+```
+card/
+├── src/                          # Package source (publishable)
+│   ├── index.ts                  # Schema + types
+│   ├── fields.tsx                # Field components (inputs bound to useFields)
+│   ├── forms.tsx                 # Form components (CreateCard, UpdateCard, DeleteCard, FilterCards)
+│   ├── components.tsx            # Display components (CardItem, SingleCard)
+│   └── provider.tsx              # CardsProvider + useCards hook
+│
+├── app/                          # Demo app (not published)
+│   ├── schema.ts                 # Database schema (assembles model schemas)
+│   ├── providers.tsx             # App-level providers (backend + model)
+│   ├── layout.tsx                # Root layout
+│   ├── page.tsx                  # List page
+│   ├── new/page.tsx              # Create page
+│   └── [id]/page.tsx             # View / Edit / Delete page
+│
+└── package.json                  # Exports map
+```
+
+### Package Exports
+
+```json
+{
+  ".":            "./src/index.ts",
+  "./fields":     "./src/fields.tsx",
+  "./forms":      "./src/forms.tsx",
+  "./components": "./src/components.tsx",
+  "./provider":   "./src/provider.tsx"
+}
+```
+
+---
+
+## How the Pieces Fit Together
+
+### 1. Schema (`src/index.ts`)
+
+The schema defines two Zod objects:
+- **`readable`** — the full record shape (includes `id` and computed/read-only fields)
+- **`writable`** — the subset of fields that can be created or updated
+
+```tsx
+import z from 'zod'
+
+export const readable = z.object({
+    id: z.string(),
+    Title: z.string().optional(),
+    Text: z.string().optional(),
+    Type: z.string().optional(),
+})
+
+export const writable = readable.pick({
+    Title: true,
+    Text: true,
+    Type: true,
+})
+
+export const schema = { readable, writable }
+
+export type Readable = z.infer<typeof readable>
+export type Writable = z.infer<typeof writable>
+```
+
+> **Convention**: `readable` always has an `id: z.string()` field. `writable` is derived from `readable` via `.pick()` or `.omit()`. Export both individual schemas and a combined `schema` object, plus the inferred types.
+
+### 2. Fields (`src/fields.tsx`)
+
+Field components are **individual input controls** bound to the framework's `useFields()` hook. They read and write a single field from the parent `FieldsProvider` context.
+
+```tsx
+import { useFields } from 'asasvirtuais/fields'
+
+export function TitleField(props: InputProps) {
+    const { fields, setField } = useFields<{ Title: string }>()
+    return (
+        <Input
+            name='Title'
+            placeholder='Card title'
+            value={fields.Title || ''}
+            onChange={e => setField('Title', e.target.value)}
+            {...props}
+        />
+    )
+}
+```
+
+> **Convention**: Each field component is named `{FieldName}Field`, uses `useFields<{ FieldName: Type }>()` for type narrowing, and accepts passthrough props for customization. These are the smallest lego blocks — they can be composed into any form layout.
+
+### 3. Provider (`src/provider.tsx`)
+
+The provider wraps the framework's `TableProvider`, binding the model's table name, schema, and the current `TableInterface` (obtained from `useInterface()`).
+
+```tsx
+import { TableProvider, useTable } from 'asasvirtuais/react-interface'
+import { useInterface } from 'asasvirtuais/interface-provider'
+import { schema } from '.'
+
+export function useCards() {
+    return useTable('Cards', schema)
+}
+
+export function CardsProvider({ children }: { children: React.ReactNode }) {
+    const cardsInterface = useInterface()
+    return (
+        <TableProvider table='Cards' schema={schema} interface={cardsInterface}>
+            {children}
+        </TableProvider>
+    )
+}
+```
+
+> **Convention**: The hook is named `use{Model}s()` (plural). The provider is `{Model}sProvider`. Both reference the table name string (e.g. `'Cards'`) and the model's `schema`. The provider gets its `TableInterface` from `useInterface()` — it never imports a specific backend.
+
+#### TableProvider & TableConsumer
+
+`TableProvider` creates a table-scoped context with reactive CRUD state. Descendants access it via:
+
+- **`useTable(tableName, schema)`** — hook that returns the full table context (`index`, `array`, `find`, `create`, `update`, `remove`, `list`)
+- **`TableConsumer`** — render-prop component that reads the same context. Useful when you want to access table data without creating a new component just for the hook:
+
+```tsx
+import { TableConsumer } from 'asasvirtuais/react-interface'
+
+<TableConsumer>
+    {({ array, remove }) => (
+        <ul>
+            {array.map(item => (
+                <li key={item.id}>
+                    {item.Title}
+                    <button onClick={() => remove.trigger({ id: item.id })}>Delete</button>
+                </li>
+            ))}
+        </ul>
+    )}
+</TableConsumer>
+```
+
+> **Note**: There is no `DatabaseProvider`. Each model gets its own `TableProvider` via its model provider (e.g. `CardsProvider`). For multi-model apps, simply nest the model providers.
+
+### 4. Forms (`src/forms.tsx`)
+
+Form components combine framework form primitives with the model's field components. There are four standard forms:
+
+#### `CreateCard` — wraps `CreateForm`
+Provides a `FieldsProvider` + `ActionProvider` that calls `create.trigger()`. Field components inside read/write to this context.
+
+#### `UpdateCard` — wraps `UpdateForm`, uses `useSingle()`
+Reads `id` and field defaults from `SingleProvider` context. Must be rendered inside a `SingleProvider`.
+
+#### `DeleteCard` — uses `useSingle()` + `useTable()`
+A button that calls `remove.trigger({ id })`. Must be rendered inside both a `SingleProvider` and a `TableProvider` (the model's provider).
+
+#### `FilterCards` — wraps `FilterForm`
+Provides a filterable list with the framework's query DSL.
+
+> **Convention**: Forms that operate on a single record (`Update`, `Delete`) use `useSingle()` and must be rendered inside a `SingleProvider`. The `Create` form is standalone. All form components accept an `onSuccess` callback.
+
+### 5. Display Components (`src/components.tsx`)
+
+Display components render record data. They use `useSingle()` to read the current record from `SingleProvider` context.
+
+#### `CardItem` — compact view for grids and lists
+Shows a card preview (thumbnail, title, type badge, clamped text). Use it inside a `SingleProvider` within a list.
+
+#### `SingleCard` — full detail view for a dedicated page
+Shows all card data in full detail (large art, full text, etc.). Use it inside a `SingleProvider` on a detail page.
+
+> **Convention**: Display components are named by their purpose:
+> - `{Model}Item` — compact/summary view (for lists, grids, tables)
+> - `Single{Model}` — full detail view (for dedicated single-record pages)
+>
+> Both **must** be rendered inside a `SingleProvider` and use `useSingle()` — they never receive record data as props.
+
+---
+
+## The SingleProvider Pattern
+
+The `SingleProvider` is the key pattern for record-level context. It:
+1. Takes `id`, `table`, and `schema` as props
+2. Looks up the record in the table's reactive index (populated by prior `list` or `find` calls)
+3. If not in the index, triggers a `find` call
+4. Renders `null` until the record is available (built-in loading state)
+5. Makes the record available via `useSingle()` to all descendants
+
+### Usage in a List Page
+
+```tsx
+const { list, array } = useTable('Cards', schema)
+
+useEffect(() => { list.trigger({}) }, [])
+
+return (
+    <SimpleGrid columns={4} gap={4}>
+        {array.map((card: Readable) => (
+            <SingleProvider key={card.id} id={card.id} table='Cards' schema={schema}>
+                <Link href={`/${card.id}`}>
+                    <CardItem />
+                </Link>
+            </SingleProvider>
+        ))}
+    </SimpleGrid>
+)
+```
+
+### Usage in a Detail Page
+
+```tsx
+<SingleProvider id={id} table='Cards' schema={schema}>
+    <SingleCard />            {/* View mode */}
+    <UpdateCard />            {/* Edit mode */}
+    <DeleteCard />            {/* Delete action */}
+</SingleProvider>
+```
+
+> The `SingleProvider` is the **universal wrapper** for any component that operates on a single record. Routing (`Link`, navigation) is always handled at the app level, not inside the components.
+
+---
+
+## Demo App Wiring
+
+### Database Schema (`app/schema.ts`)
+
+Assembles all model schemas into a single database schema. Each key is a table name.
+
+```tsx
+import * as CardModule from '@/src/index'
+
+export const schema = {
+    'Cards': CardModule.schema
+}
+```
+
+> For multi-model apps, import each model and add its schema: `{ 'Cards': CardModule.schema, 'Decks': DeckModule.schema }`.
+
+### Providers (`app/providers.tsx`)
+
+Nests the backend provider and all model providers. No `DatabaseProvider` — just the interface provider and the model providers:
+
+```tsx
+<IndexedInterfaceProvider dbName='grimoire' schema={schema}>
+    <CardsProvider>
+        {children}
+    </CardsProvider>
+</IndexedInterfaceProvider>
+```
+
+For multi-model apps, nest additional model providers:
+
+```tsx
+<IndexedInterfaceProvider dbName='grimoire' schema={schema}>
+    <CardsProvider>
+        <DecksProvider>
+            {children}
+        </DecksProvider>
+    </CardsProvider>
+</IndexedInterfaceProvider>
+```
+
+> **Backend swap**: Replace `IndexedInterfaceProvider` with `FetchInterfaceProvider` (REST API) or `MemInterfaceProvider` (in-memory) — no other changes needed.
+
+### Page Pattern
+
+Every page follows the same structure:
+
+| Route | Components Used | Pattern |
+|---|---|---|
+| `/` (List) | `useTable` → `SingleProvider` → `CardItem` | Fetch list, render items in `SingleProvider` grid |
+| `/new` (Create) | `CreateCard` | Standalone form, navigate on success |
+| `/[id]` (View/Edit/Delete) | `SingleProvider` → `SingleCard` / `UpdateCard` / `DeleteCard` | All inside one `SingleProvider`, toggle between view and edit |
+
+---
+
+## Creating a New Model Package
+
+Follow this step-by-step to scaffold a new model package (e.g. `@asasvirtuais/deck`):
+
+### 1. Define the Schema (`src/index.ts`)
+
+```tsx
+import z from 'zod'
+
+export const readable = z.object({
+    id: z.string(),
+    Name: z.string().optional(),
+    Description: z.string().optional(),
+    CardCount: z.number().optional(),
+})
+
+export const writable = readable.pick({
+    Name: true,
+    Description: true,
+})
+
+export const schema = { readable, writable }
+
+export type Readable = z.infer<typeof readable>
+export type Writable = z.infer<typeof writable>
+```
+
+### 2. Create Field Components (`src/fields.tsx`)
+
+One component per writable field:
+
+```tsx
+import { useFields } from 'asasvirtuais/fields'
+
+export function NameField(props) {
+    const { fields, setField } = useFields<{ Name: string }>()
+    return <Input name='Name' value={fields.Name || ''} onChange={e => setField('Name', e.target.value)} {...props} />
+}
+
+export function DescriptionField(props) {
+    const { fields, setField } = useFields<{ Description: string }>()
+    return <Textarea name='Description' value={fields.Description || ''} onChange={e => setField('Description', e.target.value)} {...props} />
+}
+```
+
+### 3. Create the Provider (`src/provider.tsx`)
+
+```tsx
+import { TableProvider, useTable } from 'asasvirtuais/react-interface'
+import { useInterface } from 'asasvirtuais/interface-provider'
+import { schema } from '.'
+
+export function useDecks() { return useTable('Decks', schema) }
+
+export function DecksProvider({ children }) {
+    const iface = useInterface()
+    return <TableProvider table='Decks' schema={schema} interface={iface}>{children}</TableProvider>
+}
+```
+
+### 4. Create Forms (`src/forms.tsx`)
+
+```tsx
+import { CreateForm, UpdateForm, useTable, useSingle } from 'asasvirtuais/react-interface'
+import { schema } from '.'
+import { NameField, DescriptionField } from './fields'
+
+export function CreateDeck({ onSuccess }) {
+    return (
+        <CreateForm table='Decks' schema={schema} onSuccess={onSuccess}>
+            {form => (
+                <Stack as='form' onSubmit={form.submit} gap={4}>
+                    <NameField />
+                    <DescriptionField />
+                    <Button type='submit' loading={form.loading}>Create</Button>
+                </Stack>
+            )}
+        </CreateForm>
+    )
+}
+
+export function UpdateDeck({ onSuccess }) {
+    const { single, id } = useSingle<typeof schema>()
+    return (
+        <UpdateForm table='Decks' schema={schema} id={id} defaults={{ Name: single.Name, Description: single.Description }} onSuccess={onSuccess}>
+            {form => (
+                <Stack as='form' onSubmit={form.submit} gap={4}>
+                    <NameField />
+                    <DescriptionField />
+                    <Button type='submit' loading={form.loading}>Save</Button>
+                </Stack>
+            )}
+        </UpdateForm>
+    )
+}
+
+export function DeleteDeck({ onSuccess }) {
+    const { id } = useSingle<typeof schema>()
+    const { remove } = useTable('Decks', schema)
+    return <Button colorPalette='red' onClick={async () => { await remove.trigger({ id }); onSuccess?.() }} loading={remove.loading}>Delete</Button>
+}
+```
+
+### 5. Create Display Components (`src/components.tsx`)
+
+```tsx
+import { useSingle } from 'asasvirtuais/react-interface'
+import { schema, type Readable } from '.'
+
+/** Compact view for lists. Must be inside SingleProvider. */
+export function DeckItem() {
+    const { single } = useSingle<typeof schema>()
+    const deck = single as Readable
+    return (
+        <Card.Root variant='outline'>
+            <Card.Body>
+                <Card.Title>{deck.Name || 'Untitled'}</Card.Title>
+                <Text>{deck.Description}</Text>
+            </Card.Body>
+        </Card.Root>
+    )
+}
+
+/** Full detail view. Must be inside SingleProvider. */
+export function SingleDeck() {
+    const { single } = useSingle<typeof schema>()
+    const deck = single as Readable
+    return (
+        <Stack gap={4}>
+            <Heading>{deck.Name || 'Untitled'}</Heading>
+            <Text>{deck.Description}</Text>
+        </Stack>
+    )
+}
+```
+
+### 6. Set Up Exports (`package.json`)
+
+```json
+{
+  "exports": {
+    ".":            { "types": "./src/index.ts",      "default": "./src/index.ts" },
+    "./fields":     { "types": "./src/fields.tsx",     "default": "./src/fields.tsx" },
+    "./forms":      { "types": "./src/forms.tsx",      "default": "./src/forms.tsx" },
+    "./components": { "types": "./src/components.tsx", "default": "./src/components.tsx" },
+    "./provider":   { "types": "./src/provider.tsx",   "default": "./src/provider.tsx" }
+  }
+}
+```
+
+### 7. Wire the Demo App
+
+1. Create `app/schema.ts` — `{ 'Decks': DeckModule.schema }`
+2. Create `app/providers.tsx` — `IndexedInterfaceProvider` → `DecksProvider` (no `DatabaseProvider` needed)
+3. Create `app/page.tsx` — List with `SingleProvider` → `DeckItem`
+4. Create `app/new/page.tsx` — `CreateDeck` form
+5. Create `app/[id]/page.tsx` — `SingleProvider` → `SingleDeck` / `UpdateDeck` / `DeleteDeck`
+
+---
+
+## Naming Conventions Quick Reference
+
+| Thing | Naming Pattern | Example |
+|---|---|---|
+| Table name | PascalCase plural | `'Cards'` |
+| Schema export | `{ readable, writable, schema }` | `schema = { readable, writable }` |
+| Type exports | `Readable`, `Writable` | `type Readable = z.infer<...>` |
+| Field component | `{FieldName}Field` | `TitleField`, `TextField` |
+| Provider | `{Model}sProvider` | `CardsProvider` |
+| Hook | `use{Model}s()` | `useCards()` |
+| Create form | `Create{Model}` | `CreateCard` |
+| Update form | `Update{Model}` | `UpdateCard` |
+| Delete action | `Delete{Model}` | `DeleteCard` |
+| Filter form | `Filter{Model}s` | `FilterCards` |
+| Item component | `{Model}Item` | `CardItem` |
+| Single component | `Single{Model}` | `SingleCard` |
+
+---
+
+## Key Principles
+
+1. **Schema first** — Zod defines the contract. Everything flows from `readable` and `writable`.
+2. **Backend-agnostic** — The `src/` package never imports a storage backend. The app wires the backend.
+3. **No DatabaseProvider** — Each model gets its own `TableProvider` via its model provider. For multi-model apps, nest model providers. Access table data via `useTable()` hook or `TableConsumer` render-prop.
+4. **SingleProvider is king** — Any component for a single record lives inside a `SingleProvider` and calls `useSingle()`. No prop drilling.
+5. **Fields are atoms** — Field components are the smallest units. Forms compose them. Different forms can reuse the same fields in different layouts.
+6. **Routing is app-level** — Components never contain `Link` or navigation logic. The app wraps them in `Link` or calls `router.push()` in `onSuccess` callbacks.
