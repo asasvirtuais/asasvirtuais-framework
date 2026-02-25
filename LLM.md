@@ -1,5 +1,5 @@
 # asasvirtuais Framework — AI Reference Guide
-> For AI coding assistants. This guide covers building local-first PWA apps (no server, no backend) using the asasvirtuais framework with React, Next.js App Router, IndexedDB, and Chakra UI.
+> For AI coding assistants. This guide covers building local-first PWA apps (no server, no backend) using the asasvirtuais framework with React, Next.js App Router, and IndexedDB.
 
 ---
 
@@ -79,7 +79,7 @@ The target product is a **local-first SPA installable as a PWA**. All data lives
 - An **onboarding flow** where the user configures the app for their needs — this might mean entering a name, choosing preferences, or saving an API key for an AI feature. Onboarding data is saved to IndexedDB just like any other entity.
 - The **main app** where the user creates and manages their data. This is a standard CRUD interface with list, detail, create, and edit views.
 
-Chakra UI is the preferred component library. Use it for all UI. Avoid Tailwind CSS.
+Use whichever UI component library fits your project (e.g. Chakra UI, shadcn/ui, MUI, etc.).
 
 ---
 
@@ -131,31 +131,30 @@ declare global {
 
 ### fields.tsx — Input Atoms
 
-Each field component reads and writes exactly one field via `useFields()`. They are the smallest building blocks — forms compose them.
+Each field component reads and writes exactly one field via `useFields()`. They are the smallest building blocks — forms compose them. Use whatever UI primitives your chosen library provides.
 
 ```tsx
 'use client'
-import { Input, Textarea, Stack, Text, Checkbox } from '@chakra-ui/react'
 import { useFields } from 'asasvirtuais/fields'
 
 export function TitleField() {
   const { fields, setField } = useFields<{ Title: string }>()
   return (
-    <Stack gap={1}>
-      <Text fontSize='sm' fontWeight='medium'>Title</Text>
-      <Input
+    <div>
+      <label>Title</label>
+      <input
         value={fields.Title || ''}
         onChange={e => setField('Title', e.target.value)}
         placeholder='What needs to be done?'
       />
-    </Stack>
+    </div>
   )
 }
 
 export function NotesField() {
   const { fields, setField } = useFields<{ Notes: string }>()
   return (
-    <Textarea
+    <textarea
       value={fields.Notes || ''}
       onChange={e => setField('Notes', e.target.value)}
       placeholder='Optional notes...'
@@ -167,12 +166,14 @@ export function NotesField() {
 export function DoneField() {
   const { fields, setField } = useFields<{ Done: boolean }>()
   return (
-    <Checkbox
-      checked={fields.Done || false}
-      onCheckedChange={e => setField('Done', !!e.checked)}
-    >
+    <label>
+      <input
+        type='checkbox'
+        checked={fields.Done || false}
+        onChange={e => setField('Done', e.target.checked)}
+      />
       Mark as done
-    </Checkbox>
+    </label>
   )
 }
 ```
@@ -184,7 +185,6 @@ export function DoneField() {
 import { CreateForm, UpdateForm, useSingle } from 'asasvirtuais/react-interface'
 import { schema, type Readable } from '.'
 import { TitleField, NotesField, DoneField } from './fields'
-import { Button, Stack } from '@chakra-ui/react'
 import { useTodos } from './provider'
 
 // Standalone — does not require any provider
@@ -192,13 +192,13 @@ export function CreateTodo({ onSuccess }: { onSuccess?: (todo: Readable) => void
   return (
     <CreateForm table='Todos' schema={schema} onSuccess={onSuccess}>
       {form => (
-        <Stack as='form' onSubmit={form.submit} gap={4}>
+        <form onSubmit={form.submit}>
           <TitleField />
           <NotesField />
-          <Button type='submit' loading={form.loading} colorPalette='blue'>
-            Add Todo
-          </Button>
-        </Stack>
+          <button type='submit' disabled={form.loading}>
+            {form.loading ? 'Saving...' : 'Add Todo'}
+          </button>
+        </form>
       )}
     </CreateForm>
   )
@@ -221,14 +221,14 @@ export function UpdateTodo({ onSuccess }: { onSuccess?: (todo: Readable) => void
       onSuccess={onSuccess}
     >
       {form => (
-        <Stack as='form' onSubmit={form.submit} gap={4}>
+        <form onSubmit={form.submit}>
           <TitleField />
           <NotesField />
           <DoneField />
-          <Button type='submit' loading={form.loading} colorPalette='blue'>
-            Save
-          </Button>
-        </Stack>
+          <button type='submit' disabled={form.loading}>
+            {form.loading ? 'Saving...' : 'Save'}
+          </button>
+        </form>
       )}
     </UpdateForm>
   )
@@ -239,14 +239,12 @@ export function DeleteTodo({ onSuccess }: { onSuccess?: () => void }) {
   const { id } = useSingle('Todos', schema)
   const { remove } = useTodos()
   return (
-    <Button
-      colorPalette='red'
-      variant='outline'
+    <button
       onClick={async () => { await remove.trigger({ id }); onSuccess?.() }}
-      loading={remove.loading}
+      disabled={remove.loading}
     >
-      Delete
-    </Button>
+      {remove.loading ? 'Deleting...' : 'Delete'}
+    </button>
   )
 }
 ```
@@ -259,26 +257,19 @@ These read from `useSingle()` — they never receive record data as props.
 'use client'
 import { useSingle } from 'asasvirtuais/react-interface'
 import { schema, type Readable } from '.'
-import { Card, Text, Heading, Stack, Badge } from '@chakra-ui/react'
 
 // Compact view for lists — must be inside SingleProvider
 export function TodoItem() {
   const { single } = useSingle('Todos', schema)
   const todo = single as Readable
   return (
-    <Card.Root cursor='pointer' _hover={{ shadow: 'md' }} opacity={todo.Done ? 0.6 : 1}>
-      <Card.Body>
-        <Stack gap={1}>
-          <Heading size='sm' textDecoration={todo.Done ? 'line-through' : 'none'}>
-            {todo.Title || 'Untitled'}
-          </Heading>
-          {todo.Notes && (
-            <Text fontSize='xs' color='fg.muted' lineClamp={2}>{todo.Notes}</Text>
-          )}
-          {todo.Done && <Badge colorPalette='green' w='fit-content'>Done</Badge>}
-        </Stack>
-      </Card.Body>
-    </Card.Root>
+    <div style={{ opacity: todo.Done ? 0.6 : 1 }}>
+      <h3 style={{ textDecoration: todo.Done ? 'line-through' : 'none' }}>
+        {todo.Title || 'Untitled'}
+      </h3>
+      {todo.Notes && <p>{todo.Notes}</p>}
+      {todo.Done && <span>Done</span>}
+    </div>
   )
 }
 
@@ -287,12 +278,12 @@ export function SingleTodo() {
   const { single } = useSingle('Todos', schema)
   const todo = single as Readable
   return (
-    <Stack gap={4}>
-      <Heading textDecoration={todo.Done ? 'line-through' : 'none'}>
+    <div>
+      <h1 style={{ textDecoration: todo.Done ? 'line-through' : 'none' }}>
         {todo.Title}
-      </Heading>
-      {todo.Notes && <Text whiteSpace='pre-wrap'>{todo.Notes}</Text>}
-    </Stack>
+      </h1>
+      {todo.Notes && <p>{todo.Notes}</p>}
+    </div>
   )
 }
 ```
@@ -399,7 +390,6 @@ import { SingleProvider } from 'asasvirtuais/react-interface'
 import { schema, type Readable } from '@/packages/todo'
 import { TodoItem } from '@/packages/todo/components'
 import { useTodos } from '@/packages/todo/provider'
-import { Stack, Button, Spinner, Center, Text } from '@chakra-ui/react'
 import Link from 'next/link'
 import { useEffect } from 'react'
 
@@ -408,15 +398,13 @@ export default function TodoListPage() {
 
   useEffect(() => { list.trigger({}) }, [])
 
-  if (list.loading) return <Center py={20}><Spinner /></Center>
+  if (list.loading) return <p>Loading...</p>
 
   return (
-    <Stack gap={3}>
-      <Link href='/todos/new'><Button>New Todo</Button></Link>
+    <div>
+      <Link href='/todos/new'><button>New Todo</button></Link>
 
-      {array.length === 0 && (
-        <Text color='fg.muted'>No todos yet.</Text>
-      )}
+      {array.length === 0 && <p>No todos yet.</p>}
 
       {array.map((todo: Readable) => (
         <SingleProvider key={todo.id} id={todo.id} table='Todos' schema={schema}>
@@ -425,7 +413,7 @@ export default function TodoListPage() {
           </Link>
         </SingleProvider>
       ))}
-    </Stack>
+    </div>
   )
 }
 ```
@@ -439,15 +427,14 @@ export default function TodoListPage() {
 import { FilterForm, SingleProvider } from 'asasvirtuais/react-interface'
 import { schema, type Readable } from '@/packages/todo'
 import { TodoItem } from '@/packages/todo/components'
-import { Stack, Text } from '@chakra-ui/react'
 import Link from 'next/link'
 
 export default function TodoListPage() {
   return (
     <FilterForm table='Todos' schema={schema} autoTrigger>
       {form => (
-        <Stack gap={3}>
-          {form.loading && <Text>Loading...</Text>}
+        <div>
+          {form.loading && <p>Loading...</p>}
           {(form.result || []).map((todo: Readable) => (
             <SingleProvider key={todo.id} id={todo.id} table='Todos' schema={schema}>
               <Link href={`/todos/${todo.id}`}>
@@ -455,7 +442,7 @@ export default function TodoListPage() {
               </Link>
             </SingleProvider>
           ))}
-        </Stack>
+        </div>
       )}
     </FilterForm>
   )
@@ -471,7 +458,6 @@ import { schema } from '@/packages/todo'
 import { SingleTodo } from '@/packages/todo/components'
 import { UpdateTodo, DeleteTodo } from '@/packages/todo/forms'
 import { useParams, useRouter } from 'next/navigation'
-import { Stack } from '@chakra-ui/react'
 
 export default function TodoDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -479,11 +465,9 @@ export default function TodoDetailPage() {
 
   return (
     <SingleProvider id={id} table='Todos' schema={schema}>
-      <Stack gap={6}>
-        <SingleTodo />
-        <UpdateTodo onSuccess={() => router.push('/todos')} />
-        <DeleteTodo onSuccess={() => router.push('/todos')} />
-      </Stack>
+      <SingleTodo />
+      <UpdateTodo onSuccess={() => router.push('/todos')} />
+      <DeleteTodo onSuccess={() => router.push('/todos')} />
     </SingleProvider>
   )
 }
