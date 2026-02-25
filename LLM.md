@@ -49,11 +49,6 @@ export default defineConfig({
 })
 ```
 
-If you still see errors after this, force a cache rebuild:
-```bash
-npx vite --force
-```
-
 ### Imports
 
 All framework primitives are imported directly from their source file within the package. There is no barrel `index` re-exporting everything — import from the specific module:
