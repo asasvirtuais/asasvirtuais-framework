@@ -120,14 +120,14 @@ export type Readable = z.infer<typeof readable>
 export type Writable = z.infer<typeof writable>
 
 declare global {
-  type Entity = Readable
+  type Todo = Readable
 }
 ```
 
 - `readable` always has `id: z.string()` as first field
 - `writable` is always derived from `readable` via `.pick()`
 - Always export `schema`, `Readable`, `Writable`
-- Add the `declare global { type Entity = Readable }` block for global type access
+- Add the `declare global { type Todo = Readable }` block for global type access
 
 ### fields.tsx — Input Atoms
 
