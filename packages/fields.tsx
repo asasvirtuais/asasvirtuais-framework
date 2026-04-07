@@ -36,26 +36,26 @@ export function FieldsProvider<T>({children, ...props}: FieldsProps<T> & {
     )
 }
 
-export const useFields = <T,>() => {
+export const useFields = <Fields,>() => {
 
     const context = React.useContext(Context)
 
     if (context === undefined)
         throw new Error('useFields must be used within a FieldsProvider')
 
-    return context as ReturnType<typeof useFieldsProvider<T>>
+    return context as ReturnType<typeof useFieldsProvider<Fields>>
 }
 
-export const useField = <T,>(fieldName: keyof T) => {
-    const { fields } = useFields<T>()
+export const useField = <Fields, Key extends keyof Fields = keyof Fields>(key: Key) => {
+    const { fields } = useFields<Fields>()
 
-    const value = useMemo(() => fields[fieldName], [fields, fieldName])
+    const value = useMemo(() => fields[key], [fields, key])
     const setValue = useCallback(
-        (newValue: T[keyof T]) => {
-            const { setField } = useFields<T>()
-            setField(fieldName, newValue)
+        (value: Fields[Key]) => {
+            const { setField } = useFields<Fields>()
+            setField(key, value)
         },
-        [fieldName]
+        [key]
     )
 
     return {

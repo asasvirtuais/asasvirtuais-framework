@@ -8,7 +8,7 @@ export interface TableInterface<Readable, Writable = Readable> {
   list   (props: ListProps<Readable>)   : Promise<Readable[]>
 }
 
-export function tableInterface<Schema extends DatabaseSchema, Table extends keyof Schema & string>(schema: Schema, table?: Table | null, tableInterface?: TableInterface<z.infer<Schema[Table]['readable']>, z.infer<Schema[Table]['writable']>>) {
+export function makeSchemaTableInterface<Schema extends DatabaseSchema, Table extends keyof Schema & string>(schema: Schema, table?: Table | null, tableInterface?: TableInterface<z.infer<Schema[Table]['readable']>, z.infer<Schema[Table]['writable']>>) {
   return tableInterface
 }
 

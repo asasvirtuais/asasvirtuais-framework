@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useMemo } from 'react'
+import React, { createContext, useEffect } from 'react'
 import { useCallback, useState } from 'react'
 
 export type ActionProps<Params, Result> = {
@@ -14,31 +14,6 @@ export function useActionProvider<Fields, Result>(props: React.PropsWithChildren
   const [error, setError] = useState<Error | null>(null)
   const [result, setResult] = useState<Result | null>(null)
 
-  /** receives an event (optional) and processes the form submission using the fields state as props, stores the result or error in the respective states */
-  const submit = useCallback(
-    async (e?: any) => {
-      e?.preventDefault?.()
-      setLoading(true)
-      setError(null)
-      try {
-        const result = await props.action(props.params as Fields)
-        if (props.onResult)
-          props.onResult(result)
-        setResult(result)
-      } catch (error) {
-        console.error(error)
-        if (props.onError)
-          props.onError(error as Error)
-        setError(error as Error)
-        throw error
-      } finally {
-        setLoading(false)
-      }
-      return false
-    },
-    [props.params, props.action, props.onError]
-  )
-
   const callback = useCallback(async (fields: Fields) => {
     setLoading(true)
     setError(null)
@@ -47,6 +22,7 @@ export function useActionProvider<Fields, Result>(props: React.PropsWithChildren
       if (props.onResult)
         props.onResult(result)
       setResult(result)
+      return result
     } catch (error) {
       console.error(error)
       if (props.onError)
@@ -56,8 +32,17 @@ export function useActionProvider<Fields, Result>(props: React.PropsWithChildren
     } finally {
       setLoading(false)
     }
-    return false
-  }, [props.action])
+  }, [props.action, props.onResult, props.onError])
+
+  const submit = useCallback(
+    (e?: any) => {
+      e?.preventDefault?.()
+      callback(props.params as Fields)
+      return false
+    },
+    [callback, props.params]
+  )
+
 
   useEffect(() => {
     if (props.autoTrigger)
