@@ -1,7 +1,7 @@
 {
   "name": "asasvirtuais",
   "type": "module",
-  "version": "2.5.1",
+  "version": "4.0.0",
   "directories": {
     "packages": "./packages"
   },
@@ -14,10 +14,6 @@
   ],
   "exports": {
     "./package.json": "./package.json",
-    "./auth0": {
-      "types": "./packages/auth0.ts",
-      "default": "./packages/auth0.ts"
-    },
     "./action": {
       "types": "./packages/action.tsx",
       "default": "./packages/action.tsx"
@@ -38,20 +34,20 @@
       "types": "./packages/interface.ts",
       "default": "./packages/interface.ts"
     },
-    "./react": {
-      "types": "./packages/react-interface.tsx",
-      "default": "./packages/react-interface.tsx"
-    },
+    "./providers": {
+      "types": "./packages/providers.tsx",
+      "default": "./packages/providers.tsx"
+    }
   },
   "dependencies": {
-    "dexie": "^4.4.2",
-    "react": "^19.2.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^25.3.0",
+    "react": "^19.2.4",
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
     "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "react": "^19.2.4"
   }
 }
