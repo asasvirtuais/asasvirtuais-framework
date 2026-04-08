@@ -1,97 +1,495 @@
-# Asas Virtuais Framework
+# asasvirtuais
 
-This is a framework of architectural decisions for software (web) development that takes an unorthodoxical approach to lay-out the necessary foundations for full-stack web development.
+A React framework for building full-stack apps where code is organized by feature, not by layer.
 
-Through the use of this framework I have successfully facilitated the development of full-stack apps of small and medium complexity and I would argue that it should work for large applications as well.
+---
 
-**Key Concepts**
+## Primitives
 
-**Front-end and back-end unity**: PHP has proved that the principle of single responsibility is better applied when it focuses on the responsibility of features/functionality instead of the traditional separation between front-end and back-end. Despite much criticism it's evident by how it took over the internet decades ago and now we see the same happening with React, Next.js and JSX as it finally unifies HTML, JavaScript and back-end code into a single integrated architecture, we'll leverage these technological advances to build full-stack application where the code is separated by what it does in the app-specific logic (or business logic) instead of what it does in the programming executation, prioritizing the development of fully operational and app-features. This is why we will use React and "server actions" instead of traditional API routes.
+Three building blocks, each usable on its own.
 
-**End-to-end CRUD integration**: the main problem this framework solves is keeping an app-level client-side database with all CRUD operations, providing utility hooks and helpful components to compose CRUD operations forms erradicating the need to code state changes and track the data across the steps of the CRUD operations, all of that is solved through the intelligent use of helpful components and context provider.
+### `FieldsProvider` — field state
 
-**Zero-Config**: Asasvirtuais is against configuration-based coding, which makes it unorthodoxical, here everything is constructed by coding it into the files, it gives you the helpful tools to assemble your project, but doesn't do it for you, you have to code the forms and the effects or side-effects yourself, there will never be a hook to configure an effect or side-effect into the application, if you want something to happen somewhere in the application you have to embed that into the code, there is no dependency injection strategies in here.
-
-## Core Packages
-
-**asasvirtuais/action**
-
-Provides access to asynchronous actions state and execution (loading, result, error).
 ```tsx
-import { ActionProvider, useAction } from 'asasvirtuais/action'
+import { FieldsProvider } from 'asasvirtuais/fields'
 
-const example =
-    <ActionProvider<Fields,Result> action={sumAB} params={{a:1, b: 2}} onResult={handle3} onError={handleError} autoTrigger>
-        {({
-            loading,
-            result,
-            error,
-            submit, // submit receives an optional event and calls callback passing the params, returns false
-            callback, // callback receives params and returns a promise
-            params,
-        }) => (
-            //  Your UI for the action state
-        )}
-    </ActionProvider>
+<FieldsProvider defaults={{ title: '', done: false }}>
+  {({ fields, setField }) => (
+    <div>
+      <input value={fields.title} onChange={e => setField('title', e.target.value)} />
+      <input type="checkbox" checked={fields.done} onChange={e => setField('done', e.target.checked)} />
+    </div>
+  )}
+</FieldsProvider>
 ```
-Very simple, I didn't think much to make this, I know there are a ton of libraries that do this, but I don't see any reason to overthink it. I'm not trying to be a genius here, just solve a problem in the simplest way without blocking anything. The only thing I emphasize is the use of function in the children prop which helps a lot with composability of the front-end.
 
-**asasvirtuais/fields**
-
-Provides the hooks expected to exist in the process of managing the state of fields in a form.
+### `ActionProvider` — async action state
 
 ```tsx
-import { FieldsProvider, useFields, useField } from 'asasvirtuais/fields'
+import { ActionProvider } from 'asasvirtuais/action'
 
-const example = (
-    <FieldsProvider<Fields> defaults={{a:1, b:2}}>
-        {({
-            defaults,
-            fields,
-            setField, // setField(key, value)
-            setFields, // setField({...fields})
-        }) => (
-            // Your fields UI goes here 
-            // useField(key).value
-            // useField(key).setValue
-        )}
-    </FieldsProvider>
-)
-
-useFields<Fields>()
-useField<Fields>('some key of fields')
+<ActionProvider params={{ id: todo.id }} action={archiveTodo} onResult={() => router.push('/')}>
+  {({ submit, loading, error }) => (
+    <button onClick={submit} disabled={loading}>
+      {loading ? 'Archiving...' : 'Archive'}
+    </button>
+  )}
+</ActionProvider>
 ```
-Again, simple state management withtin the context of an object that holds the fields of a form, very basic stuff. The goal is just to avoid manually coding useState, state and setState, because that is repetitive and bloats the codebase distracting us from focusing on what matters: the feature.
 
-**asasvirtuais/form**
-
-Combines the action and fields packages into a context provider that lets you manage and operate the form action and fields.
+### `Form` — fields + action together
 
 ```tsx
-import { Form, useForm } from 'asasvirtuais/form'
+import { Form } from 'asasvirtuais/form'
 
-const example = (
-    <Form<Fields,Result>
-        action={asyncAction}
-        defaults={{...}}
-        onResult={handleResult}
-        onError={handleError}
-        autoTrigger={true/false}
+<Form defaults={{ email: '', password: '' }} action={login} onResult={handleResult}>
+  {({ fields, setField, submit, loading, error }) => (
+    <form onSubmit={submit}>
+      <input value={fields.email} onChange={e => setField('email', e.target.value)} />
+      <input type="password" value={fields.password} onChange={e => setField('password', e.target.value)} />
+      <button type="submit" disabled={loading}>Login</button>
+      {error && <p>{error.message}</p>}
+    </form>
+  )}
+</Form>
+```
+
+---
+
+## Full-stack CRUD
+
+The framework provides a schema-first CRUD layer where create, update, and remove operations automatically keep the UI in sync through a reactive index — no manual state updates, no refetching.
+
+### Project structure
+
+```
+app/
+├── schema.ts             # All table schemas in one place
+├── actions.ts            # Server actions — the backend
+├── providers.tsx         # App-level providers
+├── layout.tsx
+├── todos/
+│   ├── schema.ts          # Schema + types
+│   ├── fields.tsx        # Input components
+│   ├── forms.tsx         # Create / Update / Delete / Filter forms
+│   ├── components.tsx    # Display components
+│   └── provider.tsx      # TableProvider + hook
+```
+
+---
+
+### 1. Schema
+
+Each model defines `readable` (what comes out of the database) and `writable` (what users can create or modify):
+
+```ts
+// app/todos/schema.ts
+import z from 'zod'
+
+export const readable = z.object({
+  id: z.string(),
+  title: z.string(),
+  done: z.boolean(),
+  author: z.string(),
+  createdAt: z.string(),
+})
+
+export const writable = readable.pick({
+  title: true,
+  done: true,
+})
+
+export const schema = { readable, writable }
+
+export type Readable = z.infer<typeof readable>
+export type Writable = z.infer<typeof writable>
+```
+
+All models are assembled into a single database schema file:
+
+```ts
+// app/schema.ts
+import { schema as todosSchema } from './todos/schema'
+import { schema as tagsSchema } from './tags/schema'
+
+export const schema = {
+  todos: todosSchema,
+  tags: tagsSchema,
+}
+```
+
+---
+
+### 2. Server actions — the backend
+
+The backend is plain Next.js server actions. You pass them directly to the provider — no REST routes, no fetch client needed:
+
+```ts
+// app/actions.ts
+'use server'
+
+import { firestoreInterface } from 'asasvirtuais-firebase/interface'
+import { auth0 } from '@/lib/auth0'
+
+const db = firestoreInterface()
+
+function clean(obj: any): any {
+  if (Array.isArray(obj)) return obj.map(clean)
+  if (obj !== null && typeof obj === 'object' && obj.constructor === Object) {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([_, v]) => v !== undefined)
+        .map(([k, v]) => [k, clean(v)])
+    )
+  }
+  return obj
+}
+
+export const find = async (props: any) => db.find(props)
+
+export const list = async (props: any) => db.list(props)
+
+export const create = async (props: any) => {
+  const session = await auth0.getSession()
+  if (!session?.user) throw new Error('Unauthorized')
+
+  const data = clean({ ...props.data })
+
+  if (props.table === 'todos') {
+    data.author = session.user.id
+    data.done = false
+    data.createdAt = new Date().toISOString()
+  }
+
+  return db.create({ ...props, data })
+}
+
+export const update = async (props: any) => {
+  const session = await auth0.getSession()
+  if (!session?.user) throw new Error('Unauthorized')
+
+  const data = clean({ ...props.data })
+
+  if (props.table === 'todos') {
+    const existing = await db.find({ table: 'todos', id: props.id })
+    if (existing.author !== session.user.id) throw new Error('Forbidden')
+  }
+
+  return db.update({ ...props, data })
+}
+
+export const remove = async (props: any) => {
+  const session = await auth0.getSession()
+  if (!session?.user) throw new Error('Unauthorized')
+
+  if (props.table === 'todos') {
+    const existing = await db.find({ table: 'todos', id: props.id })
+    if (existing.author !== session.user.id) throw new Error('Forbidden')
+  }
+
+  return db.remove(props)
+}
+```
+
+This is where business logic lives: auth, default values, permission checks. All in one place, all readable top to bottom.
+
+---
+
+### 3. Providers
+
+```tsx
+// app/providers.tsx
+import { InterfaceProvider } from 'asasvirtuais/interface-provider'
+import { DatabaseProvider } from 'asasvirtuais/react-interface'
+import { TodosProvider } from '@/app/todos/provider'
+import * as db from '@/app/actions'
+
+export default function AppProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <InterfaceProvider
+      find={db.find}
+      list={db.list}
+      create={db.create}
+      update={db.update}
+      remove={db.remove}
     >
-        {({
-            loading, result, error, submit, callback, params, defaults, fields, setField, setFields
-        }) => (
-            // Form UI goes here
-        )}
-    </Form>
-)
+      <DatabaseProvider>
+        <TodosProvider>
+          {children}
+        </TodosProvider>
+      </DatabaseProvider>
+    </InterfaceProvider>
+  )
+}
 ```
 
-**asasvirtuais/interface**
-Has the interface for CRUD operations to be shared across front-end and back-end of your application.
+```tsx
+// app/layout.tsx
+import AppProviders from './providers'
 
-**asasvirtuais/providers**
-Has the React context-providers for the CRUD operations to occur on the client-side of your application.
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <AppProviders>
+          {children}
+        </AppProviders>
+      </body>
+    </html>
+  )
+}
+```
 
-**asasvirtuais/form**
-Also has the utility components (forms) for the composition of the CRUD operation in your app.
+---
+
+### 4. Model provider
+
+```tsx
+// app/todos/provider.tsx
+'use client'
+import { TableProvider, useTable } from 'asasvirtuais/react-interface'
+import { useInterface } from 'asasvirtuais/interface-provider'
+import { schema } from '.'
+
+export function useTodos() {
+  return useTable('todos', schema)
+}
+
+export function TodosProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <TableProvider table="todos" schema={schema} interface={useInterface()}>
+      {children}
+    </TableProvider>
+  )
+}
+```
+
+---
+
+### 5. UI
+
+```tsx
+// app/todos/page.tsx
+'use client'
+import { useEffect } from 'react'
+import { useTodos } from './provider'
+import { SingleProvider } from 'asasvirtuais/react-interface'
+import { schema } from '.'
+import { TodoItem } from './components'
+import { CreateTodo } from './forms'
+
+export default function TodosPage() {
+  const { array, list } = useTodos()
+
+  useEffect(() => { list.trigger({}) }, [])
+
+  return (
+    <div>
+      <CreateTodo />
+      {array.map(todo => (
+        <SingleProvider key={todo.id} id={todo.id} table="todos" schema={schema}>
+          <TodoItem />
+        </SingleProvider>
+      ))}
+    </div>
+  )
+}
+```
+
+When `create` resolves, the item appears in `array` immediately. Same for `update` and `remove`.
+
+---
+
+## Listing vs. filtering
+
+### `useTable().list` — reactive, global
+
+Use this when you want all records in the reactive index. Results live in `array` and stay in sync with every create, update, and remove automatically:
+
+```tsx
+const { array, list } = useTodos()
+
+useEffect(() => { list.trigger({}) }, [])
+
+// array updates automatically when any todo is created, updated, or removed
+return array.map(todo => (
+  <SingleProvider key={todo.id} id={todo.id} table="todos" schema={schema}>
+    <TodoItem />
+  </SingleProvider>
+))
+```
+
+### `FilterForm` — local, paginated, or conditional
+
+Use `FilterForm` when you need pagination, live search, or results that belong to the component rather than the global index. Results live in `form.result` and only update when `submit` is called:
+
+```tsx
+import { FilterForm } from 'asasvirtuais/form'
+import { schema } from '.'
+
+<FilterForm table="todos" schema={schema} defaults={{ query: { done: false } }} autoTrigger>
+  {({ result, loading, fields, setField, submit }) => (
+    <div>
+      <input
+        placeholder="Search..."
+        value={fields.query?.title ?? ''}
+        onChange={e => {
+          setField('query', { title: e.target.value })
+          submit()
+        }}
+      />
+      {loading && <p>Loading...</p>}
+      {result?.map(todo => <p key={todo.id}>{todo.title}</p>)}
+    </div>
+  )}
+</FilterForm>
+```
+
+---
+
+## Async selector fields
+
+When a form needs the user to pick a record from another table, `FilterForm` composes naturally inside a field component. The field reads and writes to the parent form's context via `useFields()` — no props needed to bridge them.
+
+Say a todo can be tagged, and the user needs to search and select a tag while creating the todo:
+
+```tsx
+// app/todos/fields.tsx
+import { useFields } from 'asasvirtuais/fields'
+import { FilterForm } from 'asasvirtuais/form'
+import { schema as tagsSchema } from '@/app/tags'
+
+export function TagSelectorField() {
+  // reads/writes to whatever Form or FieldsProvider this is rendered inside
+  const { fields, setField } = useFields<{ tagId: string }>()
+
+  return (
+    <FilterForm table="tags" schema={tagsSchema} defaults={{ query: {} }}>
+      {({ fields: search, setField: setSearch, submit, result }) => (
+        <div>
+          <input
+            placeholder="Search tags..."
+            onChange={e => {
+              setSearch('query', { name: e.target.value })
+              submit()
+            }}
+          />
+          <ul>
+            {result?.map(tag => (
+              <li
+                key={tag.id}
+                onClick={() => setField('tagId', tag.id)}
+                style={{ fontWeight: fields.tagId === tag.id ? 'bold' : 'normal' }}
+              >
+                {tag.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </FilterForm>
+  )
+}
+```
+
+Use it inside any form — it just works:
+
+```tsx
+// app/todos/forms.tsx
+import { CreateForm } from 'asasvirtuais/form'
+import { schema } from '.'
+import { TitleField, TagSelectorField } from './fields'
+
+export function CreateTodo({ onSuccess }: { onSuccess?: () => void }) {
+  return (
+    <CreateForm table="todos" schema={schema} defaults={{ title: '', tagId: '' }} onSuccess={onSuccess}>
+      {({ submit, loading }) => (
+        <div>
+          <TitleField />
+          <TagSelectorField />
+          <button onClick={submit} disabled={loading}>
+            {loading ? 'Creating...' : 'Create Todo'}
+          </button>
+        </div>
+      )}
+    </CreateForm>
+  )
+}
+```
+
+The `FilterForm` queries the `tags` table asynchronously. The `CreateForm` owns the selected `tagId`. Neither knows about the other.
+
+---
+
+## The single record pattern
+
+`SingleProvider` makes a record available to all its descendants without prop drilling. When multiple components share one record, wrap them all in one provider:
+
+```tsx
+import { SingleProvider, useSingle } from 'asasvirtuais/react-interface'
+
+// Detail page
+<SingleProvider id={params.id} table="todos" schema={schema}>
+  <TodoDetail />
+  <UpdateTodoForm />
+  <DeleteTodoButton />
+</SingleProvider>
+
+// Inside any of those:
+function TodoDetail() {
+  const { single } = useSingle(schema, 'todos')
+  return <h1>{single.title}</h1>
+}
+```
+
+If the record isn't in the reactive index yet, `SingleProvider` fetches it automatically.
+
+---
+
+## Effects
+
+There is no middleware or lifecycle configuration. Effects are code written around the action:
+
+```tsx
+// Before submit
+<button onClick={() => {
+  validateForm(form.fields)
+  form.submit()
+}}>
+  Save
+</button>
+
+// After success
+<CreateForm
+  table="todos"
+  schema={schema}
+  onSuccess={todo => {
+    router.push(`/todos/${todo.id}`)
+    showNotification('Todo created!')
+  }}
+>
+  {/* ... */}
+</CreateForm>
+
+// Using field values without submitting
+<button onClick={() => saveDraftLocally(form.fields)}>
+  Save Draft
+</button>
+```
+
+---
+
+## Naming pattern examples
+
+| Concept | Pattern | Example |
+|---|---|---|
+| Table name | lowercase plural | `'todos'` |
+| Schema types | `Readable`, `Writable` | `type Readable = z.infer<...>` |
+| Field components | `{Field}Field` | `TitleField`, `DoneField` |
+| Provider | `{Model}sProvider` | `TodosProvider` |
+| Hook | `use{Model}s()` | `useTodos()` |
+| Create form | `Create{Model}` | `CreateTodo` |
+| Update form | `Update{Model}` | `UpdateTodo` |
+| Delete action | `Delete{Model}` | `DeleteTodo` |
+| Item component | `{Model}Item` | `TodoItem` |
+| Detail component | `Single{Model}` | `SingleTodo` |
