@@ -493,3 +493,64 @@ There is no middleware or lifecycle configuration. Effects are code written arou
 | Delete action | `Delete{Model}` | `DeleteTodo` |
 | Item component | `{Model}Item` | `TodoItem` |
 | Detail component | `Single{Model}` | `SingleTodo` |
+
+---
+
+## `asasvirtuais/post`
+
+Ready-to-use module for handling content items like blog posts or articles.
+
+### Sub-modules
+
+- `asasvirtuais/post/schema`: The Zod schema and `Post` type.
+- `asasvirtuais/post/provider`: `PostsProvider` and `usePosts` hook.
+- `asasvirtuais/post/fields`: Pre-built input components.
+
+### Schema
+
+```ts
+import z from 'zod'
+
+export const readable = z.object({
+    id: z.string(),
+    type: z.string().default('post'),
+    name: z.string(),
+    slug: z.string(),
+    title: z.string(),
+    content: z.string(),
+    definition: z.string(),
+    description: z.string(),
+    thumbnail: z.string(),
+    cover: z.string(),
+    tags: z.string().array(),
+})
+
+export const writable = readable.pick({
+    name: true,
+    type: true,
+    slug: true,
+    title: true,
+    content: true,
+    definition: true,
+    description: true,
+    thumbnail: true,
+    cover: true,
+    tags: true,
+})
+
+export const schema = {
+    readable,
+    writable,
+}
+
+export type Post = z.infer<typeof schema.readable>
+```
+
+### Exported Components (`asasvirtuais/post/fields`)
+
+- `NameInput`
+- `TitleInput`
+- `SlugInput`
+- `DescriptionInput`
+- `DefinitionTextarea`
+- `DescriptionTextarea`
