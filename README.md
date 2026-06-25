@@ -128,70 +128,79 @@ The backend is plain Next.js server actions. You pass them directly to the provi
 // app/actions.ts
 'use server'
 
+// any database adapter works here — firestoreInterface is just an example
 import { firestoreInterface } from 'asasvirtuais-firebase/interface'
-import { auth0 } from '@/lib/auth0'
+import { makeSchemaTableInterface } from 'asasvirtuais/interface'
+import { schema } from './schema'
 
 const db = firestoreInterface()
 
-function clean(obj: any): any {
-  if (Array.isArray(obj)) return obj.map(clean)
-  if (obj !== null && typeof obj === 'object' && obj.constructor === Object) {
-    return Object.fromEntries(
-      Object.entries(obj)
-        .filter(([_, v]) => v !== undefined)
-        .map(([k, v]) => [k, clean(v)])
-    )
-  }
-  return obj
-}
+export const { find, list, create, update, remove } = makeSchemaTableInterface(schema, null, {
+  find: async (props) => db.find(props),
 
-export const find = async (props: any) => db.find(props)
+  list: async (props) => db.list(props),
 
-export const list = async (props: any) => db.list(props)
+  create: async (props) => {
+    // authentication, validation, default values...
+    const result = await db.create(props)
+    // after-effects: send email, trigger webhook, revalidate cache...
+    return result
+  },
 
-export const create = async (props: any) => {
-  const session = await auth0.getSession()
-  if (!session?.user) throw new Error('Unauthorized')
+  update: async (props) => {
+    // authentication, authorization, validation...
+    const result = await db.update(props)
+    // after-effects...
+    return result
+  },
 
-  const data = clean({ ...props.data })
-
-  if (props.table === 'todos') {
-    data.author = session.user.id
-    data.done = false
-    data.createdAt = new Date().toISOString()
-  }
-
-  return db.create({ ...props, data })
-}
-
-export const update = async (props: any) => {
-  const session = await auth0.getSession()
-  if (!session?.user) throw new Error('Unauthorized')
-
-  const data = clean({ ...props.data })
-
-  if (props.table === 'todos') {
-    const existing = await db.find({ table: 'todos', id: props.id })
-    if (existing.author !== session.user.id) throw new Error('Forbidden')
-  }
-
-  return db.update({ ...props, data })
-}
-
-export const remove = async (props: any) => {
-  const session = await auth0.getSession()
-  if (!session?.user) throw new Error('Unauthorized')
-
-  if (props.table === 'todos') {
-    const existing = await db.find({ table: 'todos', id: props.id })
-    if (existing.author !== session.user.id) throw new Error('Forbidden')
-  }
-
-  return db.remove(props)
-}
+  remove: async (props) => {
+    // authentication, authorization...
+    const result = await db.remove(props)
+    // after-effects...
+    return result
+  },
+})!
 ```
 
 This is where business logic lives: auth, default values, permission checks. All in one place, all readable top to bottom.
+
+#### Method props
+
+Each method receives props automatically typed to the schema and table being used:
+
+| Method   | Props |
+|----------|-------|
+| `find`   | `{ table?: string, id: string }` |
+| `list`   | `{ table?: string, query?: Query<Readable> }` |
+| `create` | `{ table?: string, data: Writable }` |
+| `update` | `{ table?: string, id: string, data: Partial<Writable> }` |
+| `remove` | `{ table?: string, id: string }` |
+
+`Query` is FeathersJS-inspired and supports field matching plus operators:
+
+```ts
+{
+  // field matchers
+  title: 'Buy milk',
+  done: false,
+
+  // comparison operators
+  createdAt: { $gt: '2024-01-01' },
+  priority: { $in: [1, 2, 3] },
+
+  // pagination & projection
+  $limit: 10,
+  $skip: 20,
+  $sort: { createdAt: -1 },
+  $select: ['id', 'title'],
+
+  // logical operators
+  $or: [{ done: true }, { title: 'urgent' }],
+}
+```
+
+Available operators: `$ne`, `$lt`, `$lte`, `$gt`, `$gte`, `$in`, `$nin`, `$or`, `$and`.
 
 ---
 
@@ -202,16 +211,16 @@ This is where business logic lives: auth, default values, permission checks. All
 import { InterfaceProvider } from 'asasvirtuais/interface-provider'
 import { DatabaseProvider } from 'asasvirtuais/react-interface'
 import { TodosProvider } from '@/app/todos/provider'
-import * as db from '@/app/actions'
+import { find, list, create, update, remove } from '@/app/actions'
 
 export default function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <InterfaceProvider
-      find={db.find}
-      list={db.list}
-      create={db.create}
-      update={db.update}
-      remove={db.remove}
+      find={find}
+      list={list}
+      create={create}
+      update={update}
+      remove={remove}
     >
       <DatabaseProvider>
         <TodosProvider>
