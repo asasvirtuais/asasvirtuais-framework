@@ -311,9 +311,11 @@ When `create` resolves, the item appears in `array` immediately. Same for `updat
 
 ## Listing vs. filtering
 
+These represent two distinct approaches to fetching data:
+
 ### `useTable().list` — reactive, global
 
-Use this when you want all records in the reactive index. Results live in `array` and stay in sync with every create, update, and remove automatically:
+Use this when you want the fetched results to be available across the entire application. The `useTable.list` method updates the global index at the table context level (app level). Results live in `array` and stay in sync with every create, update, and remove automatically:
 
 ```tsx
 const { array, list } = useTodos()
@@ -330,7 +332,7 @@ return array.map(todo => (
 
 ### `FilterForm` — local, paginated, or conditional
 
-Use `FilterForm` when you need pagination, live search, or results that belong to the component rather than the global index. Results live in `form.result` and only update when `submit` is called:
+Use `FilterForm` when you need pagination, live search, or results that belong to the component rather than the global index. Using `FilterForm` is better for pagination. Unlike `useTable.list`, the `FilterForm` only saves the result to the `result` prop (inside the child function) rather than updating the global index. Results only update when `submit` is called:
 
 ```tsx
 import { FilterForm } from 'asasvirtuais/form'
@@ -353,6 +355,9 @@ import { schema } from '.'
   )}
 </FilterForm>
 ```
+
+> [!TIP]
+> **Combining with `SingleProvider`:** If you use `FilterForm`, you can combine it with `SingleProvider` by passing just the record's `id`. This ensures that the piece of data you want to present is always updated and reactive. For example, if your list query only fetches a subset of fields, but you need to show the full object details in a drawer or modal, wrapping the detail view in a `SingleProvider` will automatically fetch the complete object from the index if it's not already fully cached, while allowing the list itself to use the `result` array instead of the global `array`.
 
 ---
 
