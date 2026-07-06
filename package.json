@@ -1,7 +1,7 @@
 {
   "name": "asasvirtuais",
   "type": "module",
-  "version": "4.0.1",
+  "version": "4.1.0",
   "directories": {
     "packages": "./packages"
   },
@@ -49,6 +49,42 @@
     "./post/provider": {
       "types": "./packages/post/provider.tsx",
       "default": "./packages/post/provider.tsx"
+    },
+    "./category/schema": {
+      "types": "./packages/category/schema.ts",
+      "default": "./packages/category/schema.ts"
+    },
+    "./category/fields": {
+      "types": "./packages/category/fields.tsx",
+      "default": "./packages/category/fields.tsx"
+    },
+    "./category/provider": {
+      "types": "./packages/category/provider.tsx",
+      "default": "./packages/category/provider.tsx"
+    },
+    "./comment/schema": {
+      "types": "./packages/comment/schema.ts",
+      "default": "./packages/comment/schema.ts"
+    },
+    "./comment/fields": {
+      "types": "./packages/comment/fields.tsx",
+      "default": "./packages/comment/fields.tsx"
+    },
+    "./comment/provider": {
+      "types": "./packages/comment/provider.tsx",
+      "default": "./packages/comment/provider.tsx"
+    },
+    "./user/schema": {
+      "types": "./packages/user/schema.ts",
+      "default": "./packages/user/schema.ts"
+    },
+    "./user/fields": {
+      "types": "./packages/user/fields.tsx",
+      "default": "./packages/user/fields.tsx"
+    },
+    "./user/provider": {
+      "types": "./packages/user/provider.tsx",
+      "default": "./packages/user/provider.tsx"
     }
   },
   "dependencies": {

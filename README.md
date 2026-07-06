@@ -528,20 +528,28 @@ import z from 'zod'
 export const readable = z.object({
     id: z.string(),
     type: z.string().default('post'),
-    name: z.string(),
-    slug: z.string(),
+    name: z.string().nullable().optional(),
+    slug: z.string().nullable().optional(),
     title: z.string(),
     content: z.string(),
-    definition: z.string(),
-    description: z.string(),
-    thumbnail: z.string(),
-    cover: z.string(),
-    tags: z.string().array(),
+    definition: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    thumbnail: z.string().nullable().optional(),
+    cover: z.string().nullable().optional(),
+    tags: z.string().array().default([]),
+    category: z.string().nullable().optional(),
+    status: z.string().default('draft'),
+    author: z.string().nullable().optional(),
+    parent: z.string().nullable().optional(),
+    meta: z.any().nullable().optional(),
+    attachments: z.any().nullable().optional(),
+    created: z.string().optional(),
+    updated: z.string().optional(),
 })
 
 export const writable = readable.pick({
-    name: true,
     type: true,
+    name: true,
     slug: true,
     title: true,
     content: true,
@@ -550,6 +558,14 @@ export const writable = readable.pick({
     thumbnail: true,
     cover: true,
     tags: true,
+    category: true,
+    status: true,
+    author: true,
+    parent: true,
+    meta: true,
+    attachments: true,
+    created: true,
+    updated: true,
 })
 
 export const schema = {
@@ -568,3 +584,176 @@ export type Post = z.infer<typeof schema.readable>
 - `DescriptionInput`
 - `DefinitionTextarea`
 - `DescriptionTextarea`
+- `TypeInput`
+- `ContentTextarea`
+- `ThumbnailInput`
+- `CoverInput`
+- `TagsInput`
+- `CategorySelect` (populates options with categories from `useCategories()`)
+- `StatusInput`
+- `AuthorInput`
+- `CreatedInput`
+- `UpdatedInput`
+- `ParentSelect` (populates options with posts from `usePosts()`)
+
+---
+
+## `asasvirtuais/category`
+
+Ready-to-use module for handling hierarchical taxonomy classifications (categories, tags, custom taxonomies like guilds/tenants).
+
+### Sub-modules
+
+- `asasvirtuais/category/schema`: The Zod schema and `Category` type.
+- `asasvirtuais/category/provider`: `CategoriesProvider` and `useCategories` hook.
+- `asasvirtuais/category/fields`: Pre-built taxonomy input components.
+
+### Schema
+
+```ts
+import z from 'zod'
+
+export const readable = z.object({
+    id: z.string(),
+    type: z.string().default('category'),
+    name: z.string(),
+    slug: z.string(),
+    description: z.string().nullable().optional(),
+    parent: z.string().nullable().optional(),
+    meta: z.any().nullable().optional(),
+    created: z.string().optional(),
+    updated: z.string().optional(),
+})
+
+export const writable = readable.pick({
+    type: true,
+    name: true,
+    slug: true,
+    description: true,
+    parent: true,
+    meta: true,
+    created: true,
+    updated: true,
+})
+```
+
+### Exported Components (`asasvirtuais/category/fields`)
+
+- `TypeInput`
+- `NameInput`
+- `SlugInput`
+- `DescriptionTextarea`
+- `CreatedInput`
+- `UpdatedInput`
+- `ParentSelect` (populates options with categories from `useCategories()`)
+
+---
+
+## `asasvirtuais/comment`
+
+Ready-to-use module for handling threaded feedback loops, timelines, turns, and event registers.
+
+### Sub-modules
+
+- `asasvirtuais/comment/schema`: The Zod schema and `Comment` type.
+- `asasvirtuais/comment/provider`: `CommentsProvider` and `useComments` hook.
+- `asasvirtuais/comment/fields`: Pre-built comment feedback component fields.
+
+### Schema
+
+```ts
+import z from 'zod'
+
+export const readable = z.object({
+    id: z.string(),
+    post: z.string(),
+    parent: z.string().nullable().optional(),
+    author: z.string(),
+    content: z.string(),
+    status: z.string().default('approved'),
+    type: z.string().default('comment'),
+    meta: z.any().nullable().optional(),
+    attachments: z.any().nullable().optional(),
+    created: z.string().optional(),
+    updated: z.string().optional(),
+})
+
+export const writable = readable.pick({
+    post: true,
+    parent: true,
+    author: true,
+    content: true,
+    status: true,
+    type: true,
+    meta: true,
+    attachments: true,
+    created: true,
+    updated: true,
+})
+```
+
+### Exported Components (`asasvirtuais/comment/fields`)
+
+- `ContentTextarea`
+- `AuthorInput`
+- `StatusInput`
+- `TypeInput`
+- `CreatedInput`
+- `UpdatedInput`
+- `PostSelect` (populates options with posts from `usePosts()`)
+- `ParentSelect` (populates options with comments from `useComments()`)
+
+---
+
+## `asasvirtuais/user`
+
+Ready-to-use module for handling user profiles and authentication mapping (OAuth, Auth0, etc.).
+
+### Sub-modules
+
+- `asasvirtuais/user/schema`: The Zod schema and `User` type.
+- `asasvirtuais/user/provider`: `UsersProvider` and `useUsers` hook.
+- `asasvirtuais/user/fields`: Pre-built user fields inputs.
+
+### Schema
+
+```ts
+import z from 'zod'
+
+export const readable = z.object({
+    id: z.string(),
+    oauthId: z.string(),
+    name: z.string(),
+    username: z.string(),
+    email: z.string().email(),
+    role: z.string().default('subscriber'),
+    status: z.string().default('active'),
+    meta: z.any().nullable().optional(),
+    created: z.string().optional(),
+    updated: z.string().optional(),
+})
+
+export const writable = readable.pick({
+    oauthId: true,
+    name: true,
+    username: true,
+    email: true,
+    role: true,
+    status: true,
+    meta: true,
+    created: true,
+    updated: true,
+})
+```
+
+### Exported Components (`asasvirtuais/user/fields`)
+
+- `OauthIdInput`
+- `NameInput`
+- `UsernameInput`
+- `EmailInput`
+- `RoleInput`
+- `StatusInput`
+- `CreatedInput`
+- `UpdatedInput`
+
