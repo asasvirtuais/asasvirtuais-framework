@@ -50,11 +50,10 @@ export const useField = <Fields, Key extends keyof Fields = keyof Fields>(key: K
     const { fields } = useFields<Fields>()
 
     const value = useMemo(() => fields[key], [fields, key])
+    const { setField } = useFields<Fields>()
+
     const setValue = useCallback(
-        (value: Fields[Key]) => {
-            const { setField } = useFields<Fields>()
-            setField(key, value)
-        },
+        (value: Fields[Key]) => setField(key, value),
         [key]
     )
 

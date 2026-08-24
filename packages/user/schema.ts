@@ -5,7 +5,7 @@ export const readable = z.object({
     oauthId: z.string(),
     name: z.string(),
     username: z.string(),
-    email: z.string().email(),
+    email: z.email(),
     role: z.string().default('subscriber'),
     status: z.string().default('active'),
     meta: z.any().nullable().optional(),

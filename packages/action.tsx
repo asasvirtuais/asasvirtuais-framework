@@ -15,8 +15,13 @@ export function useActionProvider<Fields, Result>(props: React.PropsWithChildren
   const [result, setResult] = useState<Result | null>(null)
 
   const callback = useCallback(async (fields: Fields) => {
+
+    if (loading)
+      return
+
     setLoading(true)
     setError(null)
+
     try {
       const result = await props.action(fields)
       if (props.onResult)
@@ -32,7 +37,7 @@ export function useActionProvider<Fields, Result>(props: React.PropsWithChildren
     } finally {
       setLoading(false)
     }
-  }, [props.action, props.onResult, props.onError])
+  }, [props.action, props.onResult, props.onError, loading])
 
   const submit = useCallback(
     (e?: any) => {
