@@ -668,6 +668,41 @@ There is no middleware or lifecycle configuration. Effects are code written arou
 
 ---
 
+## Error handling (optional pattern)
+
+`asasvirtuais` doesn't enforce a return or throw convention for actions — that's intentional. Most MVPs don't need error handling beyond "don't crash," and this pattern exists for when you do.
+
+```ts
+// app/actions.ts
+export const { find, list, create, update, remove } = makeSchemaTableInterface(schema, null, {
+  create: async (props) => {
+    try {
+      return await db.create(props)
+    } catch (error) {
+      return { error }
+    }
+  },
+  // same shape for update, remove, etc.
+})!
+```
+
+```tsx
+// app/providers.tsx — wrap the methods passed to InterfaceProvider
+const wrap = (fn: Function) => async (props: any) => {
+  const result = await fn(props)
+  if (result?.error) throw result.error
+  return result
+}
+
+<InterfaceProvider
+  find={wrap(find)}
+  list={wrap(list)}
+  create={wrap(create)}
+  update={wrap(update)}
+  remove={wrap(remove)}
+>
+```
+
 ## `asasvirtuais/post`
 
 Ready-to-use module for handling content items like blog posts or articles.
@@ -914,4 +949,4 @@ export const writable = readable.pick({
 - `StatusInput`
 - `CreatedInput`
 - `UpdatedInput`
-
+
