@@ -54,6 +54,92 @@ import { Form } from 'asasvirtuais/form'
 </Form>
 ```
 
+#### Nested forms & async multi-step flows (namespaced render props)
+
+When building multi-step wizards or composing sub-forms (forms inside forms), **name the render-props parameter after what the form represents** (for example, `order` and `zip`) instead of destructuring `{ fields, setField, submit }`.
+
+This namespaces all fields, actions, and states in the same lexical closure, allowing the developer to access `order.fields` and `zip.fields` side-by-side without collisions:
+
+```tsx
+import { Form } from 'asasvirtuais/form'
+
+// Async action handlers
+async function submitOrder(data: { item: string; quantity: number; address: string }) {
+  return await placeOrder(data)
+}
+
+async function lookupZip(data: { zipCode: string }) {
+  return await fetchAddressByZip(data.zipCode)
+}
+
+export function CheckoutForm() {
+  return (
+    <Form
+      defaults={{ item: 'Mechanical Keyboard', quantity: 1, address: '' }}
+      action={submitOrder}
+      onResult={result => alert(`Order placed: ${result.id}`)}
+    >
+      {order => (
+        <form onSubmit={order.submit}>
+          <h3>Order Details</h3>
+
+          <input
+            value={order.fields.item}
+            onChange={e => order.setField('item', e.target.value)}
+          />
+          <input
+            type="number"
+            value={order.fields.quantity}
+            onChange={e => order.setField('quantity', Number(e.target.value))}
+          />
+
+          {/* Nested async form for postal code verification & address lookup */}
+          <Form defaults={{ zipCode: '' }} action={lookupZip}>
+            {zip => (
+              <div className="nested-lookup">
+                <h4>Shipping Address Lookup</h4>
+                <input
+                  placeholder="Enter ZIP code..."
+                  value={zip.fields.zipCode}
+                  onChange={e => zip.setField('zipCode', e.target.value)}
+                />
+                <button
+                  type="button"
+                  disabled={zip.loading || !zip.fields.zipCode}
+                  onClick={async () => {
+                    // Trigger the inner async action and set the outer form field in the same closure
+                    const addressInfo = await zip.callback(zip.fields)
+                    order.setField('address', `${addressInfo.street}, ${addressInfo.city} - ${addressInfo.state}`)
+                  }}
+                >
+                  {zip.loading ? 'Verifying ZIP...' : 'Autofill Address'}
+                </button>
+                {zip.error && <p className="error">{zip.error.message}</p>}
+              </div>
+            )}
+          </Form>
+
+          {/* Display address populated from the nested form */}
+          {order.fields.address && (
+            <p><strong>Shipping to:</strong> {order.fields.address}</p>
+          )}
+
+          <button type="submit" disabled={order.loading}>
+            {order.loading ? 'Placing Order...' : 'Place Order'}
+          </button>
+          {order.error && <p className="error">{order.error.message}</p>}
+        </form>
+      )}
+    </Form>
+  )
+}
+```
+
+Key advantages of namespacing props:
+- **Zero collisions in closure:** `order.fields` and `zip.fields` (plus `order.setField`, `zip.callback`, etc.) coexist cleanly without naming clashes or prop drilling.
+- **Independent async states:** `order.loading` and `zip.loading` run independently. Sub-actions do not falsely trigger loading on the parent form.
+- **Multi-step wizards:** Inner forms can act as discrete validation steps, remote token generators, or async selectors, writing back their validated results to `order.setField(...)` before the parent form advances or completes.
+
 ---
 
 ## Full-stack CRUD
@@ -208,8 +294,7 @@ Available operators: `$ne`, `$lt`, `$lte`, `$gt`, `$gte`, `$in`, `$nin`, `$or`, 
 
 ```tsx
 // app/providers.tsx
-import { InterfaceProvider } from 'asasvirtuais/interface-provider'
-import { DatabaseProvider } from 'asasvirtuais/react-interface'
+import { InterfaceProvider, DatabaseProvider } from 'asasvirtuais/providers'
 import { TodosProvider } from '@/app/todos/provider'
 import { find, list, create, update, remove } from '@/app/actions'
 
@@ -256,9 +341,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ```tsx
 // app/todos/provider.tsx
 'use client'
-import { TableProvider, useTable } from 'asasvirtuais/react-interface'
-import { useInterface } from 'asasvirtuais/interface-provider'
-import { schema } from '.'
+import { TableProvider, useTable, useInterface } from 'asasvirtuais/providers'
+import { schema } from './schema'
 
 export function useTodos() {
   return useTable('todos', schema)
@@ -282,8 +366,8 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
 'use client'
 import { useEffect } from 'react'
 import { useTodos } from './provider'
-import { SingleProvider } from 'asasvirtuais/react-interface'
-import { schema } from '.'
+import { SingleProvider } from 'asasvirtuais/providers'
+import { schema } from './schema'
 import { TodoItem } from './components'
 import { CreateTodo } from './forms'
 
@@ -306,6 +390,80 @@ export default function TodosPage() {
 ```
 
 When `create` resolves, the item appears in `array` immediately. Same for `update` and `remove`.
+
+---
+
+## Rapid prototyping & demo bootstrapping (AGENTS.md standard)
+
+> [!IMPORTANT]
+> **Architecture rule for agents and developers:**
+> When building new applications, prototypes, or feature demos, **always initiate apps directly with the framework from scratch**. Never build throwaway UI mockups using disconnected React state (`useState`) or temporary mock arrays. The UI demos should *already* be built on the framework architecture from day one.
+
+### The zero-backend bootstrap strategy: `asasvirtuais-dexie` + `asAbove`
+
+To prototype rapidly without setting up a remote backend or database:
+1. Use client-side IndexedDB via `asasvirtuais-dexie` as the `TableInterface`.
+2. Prime each `TableProvider` with initial mock/demo data passed to its `asAbove` prop.
+
+#### How `asAbove` works ("As above, so below")
+
+`TableProvider` accepts an optional `asAbove?: Record<string, Readable>` prop. On mount, it hydrates the reactive index immediately (`index.setIndex({ ...asAbove })`). This means:
+- All list views, single providers, and forms render instant data on the very first frame.
+- Any create, update, or remove operations execute against IndexedDB and stay synchronized across the entire UI through the reactive index.
+- No remote backend, credentials, or network connection required.
+
+```tsx
+// app/providers.tsx
+'use client'
+import { dexieInterface } from 'asasvirtuais-dexie'
+import { InterfaceProvider, DatabaseProvider, TableProvider } from 'asasvirtuais/providers'
+import { schema as todosSchema, Readable as Todo } from './todos/schema'
+import { schema as tagsSchema, Readable as Tag } from './tags/schema'
+
+// 1. Client-side IndexedDB adapter matching the TableInterface contract
+const db = dexieInterface({
+  todos: todosSchema,
+  tags: tagsSchema,
+})
+
+// 2. Initial demo seed data, keyed by record id
+const demoTodos: Record<string, Todo> = {
+  '1': {
+    id: '1',
+    title: 'Explore asasvirtuais framework',
+    done: true,
+    author: 'agent',
+    createdAt: '2026-09-01T00:00:00Z',
+  },
+  '2': {
+    id: '2',
+    title: 'Bootstrap demo with asasvirtuais-dexie',
+    done: false,
+    author: 'agent',
+    createdAt: '2026-09-02T00:00:00Z',
+  },
+}
+
+export default function DemoProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <InterfaceProvider {...db}>
+      <DatabaseProvider>
+        {/* Pass seed data to asAbove to immediately prime the reactive index */}
+        <TableProvider table="todos" schema={todosSchema} interface={db} asAbove={demoTodos}>
+          {children}
+        </TableProvider>
+      </DatabaseProvider>
+    </InterfaceProvider>
+  )
+}
+```
+
+### Transitioning from demo to production
+
+Because your prototype already uses `TableProvider`, `CreateForm`, `SingleProvider`, and reactive hooks, transitioning to production requires **zero changes to your UI or business logic components**:
+
+1. Replace `dexieInterface` in `AppProviders` with server actions (`makeSchemaTableInterface`) or `asasvirtuais-firebase`.
+2. Remove the `asAbove` seed prop once live data is served by the production database.
 
 ---
 
@@ -336,7 +494,7 @@ Use `FilterForm` when you need pagination, live search, or results that belong t
 
 ```tsx
 import { FilterForm } from 'asasvirtuais/form'
-import { schema } from '.'
+import { schema } from './schema'
 
 <FilterForm table="todos" schema={schema} defaults={{ query: { done: false } }} autoTrigger>
   {({ result, loading, fields, setField, submit }) => (
@@ -371,7 +529,7 @@ Say a todo can be tagged, and the user needs to search and select a tag while cr
 // app/todos/fields.tsx
 import { useFields } from 'asasvirtuais/fields'
 import { FilterForm } from 'asasvirtuais/form'
-import { schema as tagsSchema } from '@/app/tags'
+import { schema as tagsSchema } from '@/app/tags/schema'
 
 export function TagSelectorField() {
   // reads/writes to whatever Form or FieldsProvider this is rendered inside
@@ -411,7 +569,7 @@ Use it inside any form — it just works:
 ```tsx
 // app/todos/forms.tsx
 import { CreateForm } from 'asasvirtuais/form'
-import { schema } from '.'
+import { schema } from './schema'
 import { TitleField, TagSelectorField } from './fields'
 
 export function CreateTodo({ onSuccess }: { onSuccess?: () => void }) {
@@ -440,7 +598,7 @@ The `FilterForm` queries the `tags` table asynchronously. The `CreateForm` owns 
 `SingleProvider` makes a record available to all its descendants without prop drilling. When multiple components share one record, wrap them all in one provider:
 
 ```tsx
-import { SingleProvider, useSingle } from 'asasvirtuais/react-interface'
+import { SingleProvider, useSingle } from 'asasvirtuais/providers'
 
 // Detail page
 <SingleProvider id={params.id} table="todos" schema={schema}>
