@@ -17,7 +17,7 @@ import { FieldsProvider } from 'asasvirtuais/fields'
   {({ fields, setField }) => (
     <div>
       <input value={fields.title} onChange={e => setField('title', e.target.value)} />
-      <input type="checkbox" checked={fields.done} onChange={e => setField('done', e.target.checked)} />
+      <input type='checkbox' checked={fields.done} onChange={e => setField('done', e.target.checked)} />
     </div>
   )}
 </FieldsProvider>
@@ -46,8 +46,8 @@ import { Form } from 'asasvirtuais/form'
   {({ fields, setField, submit, loading, error }) => (
     <form onSubmit={submit}>
       <input value={fields.email} onChange={e => setField('email', e.target.value)} />
-      <input type="password" value={fields.password} onChange={e => setField('password', e.target.value)} />
-      <button type="submit" disabled={loading}>Login</button>
+      <input type='password' value={fields.password} onChange={e => setField('password', e.target.value)} />
+      <button type='submit' disabled={loading}>Login</button>
       {error && <p>{error.message}</p>}
     </form>
   )}
@@ -64,7 +64,7 @@ This namespaces all fields, actions, and states in the same lexical closure, all
 import { Form } from 'asasvirtuais/form'
 
 // Async action handlers
-async function submitOrder(data: { item: string; quantity: number; address: string }) {
+async function submitOrder(data: { item: string quantity: number address: string }) {
   return await placeOrder(data)
 }
 
@@ -88,7 +88,7 @@ export function CheckoutForm() {
             onChange={e => order.setField('item', e.target.value)}
           />
           <input
-            type="number"
+            type='number'
             value={order.fields.quantity}
             onChange={e => order.setField('quantity', Number(e.target.value))}
           />
@@ -96,15 +96,15 @@ export function CheckoutForm() {
           {/* Nested async form for postal code verification & address lookup */}
           <Form defaults={{ zipCode: '' }} action={lookupZip}>
             {zip => (
-              <div className="nested-lookup">
+              <div className='nested-lookup'>
                 <h4>Shipping Address Lookup</h4>
                 <input
-                  placeholder="Enter ZIP code..."
+                  placeholder='Enter ZIP code...'
                   value={zip.fields.zipCode}
                   onChange={e => zip.setField('zipCode', e.target.value)}
                 />
                 <button
-                  type="button"
+                  type='button'
                   disabled={zip.loading || !zip.fields.zipCode}
                   onClick={async () => {
                     // Trigger the inner async action and set the outer form field in the same closure
@@ -114,7 +114,7 @@ export function CheckoutForm() {
                 >
                   {zip.loading ? 'Verifying ZIP...' : 'Autofill Address'}
                 </button>
-                {zip.error && <p className="error">{zip.error.message}</p>}
+                {zip.error && <p className='error'>{zip.error.message}</p>}
               </div>
             )}
           </Form>
@@ -124,10 +124,10 @@ export function CheckoutForm() {
             <p><strong>Shipping to:</strong> {order.fields.address}</p>
           )}
 
-          <button type="submit" disabled={order.loading}>
+          <button type='submit' disabled={order.loading}>
             {order.loading ? 'Placing Order...' : 'Place Order'}
           </button>
-          {order.error && <p className="error">{order.error.message}</p>}
+          {order.error && <p className='error'>{order.error.message}</p>}
         </form>
       )}
     </Form>
@@ -323,7 +323,7 @@ import AppProviders from './providers'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang='en'>
       <body>
         <AppProviders>
           {children}
@@ -350,7 +350,7 @@ export function useTodos() {
 
 export function TodosProvider({ children }: { children: React.ReactNode }) {
   return (
-    <TableProvider table="todos" schema={schema} interface={useInterface()}>
+    <TableProvider table='todos' schema={schema} interface={useInterface()}>
       {children}
     </TableProvider>
   )
@@ -380,7 +380,7 @@ export default function TodosPage() {
     <div>
       <CreateTodo />
       {array.map(todo => (
-        <SingleProvider key={todo.id} id={todo.id} table="todos" schema={schema}>
+        <SingleProvider key={todo.id} id={todo.id} table='todos' schema={schema}>
           <TodoItem />
         </SingleProvider>
       ))}
@@ -405,7 +405,7 @@ To prototype rapidly without setting up a remote backend or database:
 1. Use client-side IndexedDB via `asasvirtuais-dexie` as the `TableInterface`.
 2. Prime each `TableProvider` with initial mock/demo data passed to its `asAbove` prop.
 
-#### How `asAbove` works ("As above, so below")
+#### How `asAbove` works ('As above, so below')
 
 `TableProvider` accepts an optional `asAbove?: Record<string, Readable>` prop. On mount, it hydrates the reactive index immediately (`index.setIndex({ ...asAbove })`). This means:
 - All list views, single providers, and forms render instant data on the very first frame.
@@ -449,7 +449,7 @@ export default function DemoProviders({ children }: { children: React.ReactNode 
     <InterfaceProvider {...db}>
       <DatabaseProvider>
         {/* Pass seed data to asAbove to immediately prime the reactive index */}
-        <TableProvider table="todos" schema={todosSchema} interface={db} asAbove={demoTodos}>
+        <TableProvider table='todos' schema={todosSchema} interface={db} asAbove={demoTodos}>
           {children}
         </TableProvider>
       </DatabaseProvider>
@@ -482,7 +482,7 @@ useEffect(() => { list.trigger({}) }, [])
 
 // array updates automatically when any todo is created, updated, or removed
 return array.map(todo => (
-  <SingleProvider key={todo.id} id={todo.id} table="todos" schema={schema}>
+  <SingleProvider key={todo.id} id={todo.id} table='todos' schema={schema}>
     <TodoItem />
   </SingleProvider>
 ))
@@ -496,11 +496,11 @@ Use `FilterForm` when you need pagination, live search, or results that belong t
 import { FilterForm } from 'asasvirtuais/form'
 import { schema } from './schema'
 
-<FilterForm table="todos" schema={schema} defaults={{ query: { done: false } }} autoTrigger>
+<FilterForm table='todos' schema={schema} defaults={{ query: { done: false } }} autoTrigger>
   {({ result, loading, fields, setField, submit }) => (
     <div>
       <input
-        placeholder="Search..."
+        placeholder='Search...'
         value={fields.query?.title ?? ''}
         onChange={e => {
           setField('query', { title: e.target.value })
@@ -536,11 +536,11 @@ export function TagSelectorField() {
   const { fields, setField } = useFields<{ tagId: string }>()
 
   return (
-    <FilterForm table="tags" schema={tagsSchema} defaults={{ query: {} }}>
+    <FilterForm table='tags' schema={tagsSchema} defaults={{ query: {} }}>
       {({ fields: search, setField: setSearch, submit, result }) => (
         <div>
           <input
-            placeholder="Search tags..."
+            placeholder='Search tags...'
             onChange={e => {
               setSearch('query', { name: e.target.value })
               submit()
@@ -574,7 +574,7 @@ import { TitleField, TagSelectorField } from './fields'
 
 export function CreateTodo({ onSuccess }: { onSuccess?: () => void }) {
   return (
-    <CreateForm table="todos" schema={schema} defaults={{ title: '', tagId: '' }} onSuccess={onSuccess}>
+    <CreateForm table='todos' schema={schema} defaults={{ title: '', tagId: '' }} onSuccess={onSuccess}>
       {({ submit, loading }) => (
         <div>
           <TitleField />
@@ -601,7 +601,7 @@ The `FilterForm` queries the `tags` table asynchronously. The `CreateForm` owns 
 import { SingleProvider, useSingle } from 'asasvirtuais/providers'
 
 // Detail page
-<SingleProvider id={params.id} table="todos" schema={schema}>
+<SingleProvider id={params.id} table='todos' schema={schema}>
   <TodoDetail />
   <UpdateTodoForm />
   <DeleteTodoButton />
@@ -633,7 +633,7 @@ There is no middleware or lifecycle configuration. Effects are code written arou
 
 // After success
 <CreateForm
-  table="todos"
+  table='todos'
   schema={schema}
   onSuccess={todo => {
     router.push(`/todos/${todo.id}`)
@@ -670,7 +670,7 @@ There is no middleware or lifecycle configuration. Effects are code written arou
 
 ## Error handling (optional pattern)
 
-`asasvirtuais` doesn't enforce a return or throw convention for actions — that's intentional. Most MVPs don't need error handling beyond "don't crash," and this pattern exists for when you do.
+`asasvirtuais` doesn't enforce a return or throw convention for actions — that's intentional. Most MVPs don't need error handling beyond 'don't crash,' and this pattern exists for when you do.
 
 ```ts
 // app/actions.ts
@@ -702,251 +702,3 @@ const wrap = (fn: Function) => async (props: any) => {
   remove={wrap(remove)}
 >
 ```
-
-## `asasvirtuais/post`
-
-Ready-to-use module for handling content items like blog posts or articles.
-
-### Sub-modules
-
-- `asasvirtuais/post/schema`: The Zod schema and `Post` type.
-- `asasvirtuais/post/provider`: `PostsProvider` and `usePosts` hook.
-- `asasvirtuais/post/fields`: Pre-built input components.
-
-### Schema
-
-```ts
-import z from 'zod'
-
-export const readable = z.object({
-    id: z.string(),
-    type: z.string().default('post'),
-    name: z.string().nullable().optional(),
-    slug: z.string().nullable().optional(),
-    title: z.string(),
-    content: z.string(),
-    definition: z.string().nullable().optional(),
-    description: z.string().nullable().optional(),
-    thumbnail: z.string().nullable().optional(),
-    cover: z.string().nullable().optional(),
-    tags: z.string().array().default([]),
-    category: z.string().nullable().optional(),
-    status: z.string().default('draft'),
-    author: z.string().nullable().optional(),
-    parent: z.string().nullable().optional(),
-    meta: z.any().nullable().optional(),
-    attachments: z.any().nullable().optional(),
-    created: z.string().optional(),
-    updated: z.string().optional(),
-})
-
-export const writable = readable.pick({
-    type: true,
-    name: true,
-    slug: true,
-    title: true,
-    content: true,
-    definition: true,
-    description: true,
-    thumbnail: true,
-    cover: true,
-    tags: true,
-    category: true,
-    status: true,
-    author: true,
-    parent: true,
-    meta: true,
-    attachments: true,
-    created: true,
-    updated: true,
-})
-
-export const schema = {
-    readable,
-    writable,
-}
-
-export type Post = z.infer<typeof schema.readable>
-```
-
-### Exported Components (`asasvirtuais/post/fields`)
-
-- `NameInput`
-- `TitleInput`
-- `SlugInput`
-- `DescriptionInput`
-- `DefinitionTextarea`
-- `DescriptionTextarea`
-- `TypeInput`
-- `ContentTextarea`
-- `ThumbnailInput`
-- `CoverInput`
-- `TagsInput`
-- `CategorySelect` (populates options with categories from `useCategories()`)
-- `StatusInput`
-- `AuthorInput`
-- `CreatedInput`
-- `UpdatedInput`
-- `ParentSelect` (populates options with posts from `usePosts()`)
-
----
-
-## `asasvirtuais/category`
-
-Ready-to-use module for handling hierarchical taxonomy classifications (categories, tags, custom taxonomies like guilds/tenants).
-
-### Sub-modules
-
-- `asasvirtuais/category/schema`: The Zod schema and `Category` type.
-- `asasvirtuais/category/provider`: `CategoriesProvider` and `useCategories` hook.
-- `asasvirtuais/category/fields`: Pre-built taxonomy input components.
-
-### Schema
-
-```ts
-import z from 'zod'
-
-export const readable = z.object({
-    id: z.string(),
-    type: z.string().default('category'),
-    name: z.string(),
-    slug: z.string(),
-    description: z.string().nullable().optional(),
-    parent: z.string().nullable().optional(),
-    meta: z.any().nullable().optional(),
-    created: z.string().optional(),
-    updated: z.string().optional(),
-})
-
-export const writable = readable.pick({
-    type: true,
-    name: true,
-    slug: true,
-    description: true,
-    parent: true,
-    meta: true,
-    created: true,
-    updated: true,
-})
-```
-
-### Exported Components (`asasvirtuais/category/fields`)
-
-- `TypeInput`
-- `NameInput`
-- `SlugInput`
-- `DescriptionTextarea`
-- `CreatedInput`
-- `UpdatedInput`
-- `ParentSelect` (populates options with categories from `useCategories()`)
-
----
-
-## `asasvirtuais/comment`
-
-Ready-to-use module for handling threaded feedback loops, timelines, turns, and event registers.
-
-### Sub-modules
-
-- `asasvirtuais/comment/schema`: The Zod schema and `Comment` type.
-- `asasvirtuais/comment/provider`: `CommentsProvider` and `useComments` hook.
-- `asasvirtuais/comment/fields`: Pre-built comment feedback component fields.
-
-### Schema
-
-```ts
-import z from 'zod'
-
-export const readable = z.object({
-    id: z.string(),
-    post: z.string(),
-    parent: z.string().nullable().optional(),
-    author: z.string(),
-    content: z.string(),
-    status: z.string().default('approved'),
-    type: z.string().default('comment'),
-    meta: z.any().nullable().optional(),
-    attachments: z.any().nullable().optional(),
-    created: z.string().optional(),
-    updated: z.string().optional(),
-})
-
-export const writable = readable.pick({
-    post: true,
-    parent: true,
-    author: true,
-    content: true,
-    status: true,
-    type: true,
-    meta: true,
-    attachments: true,
-    created: true,
-    updated: true,
-})
-```
-
-### Exported Components (`asasvirtuais/comment/fields`)
-
-- `ContentTextarea`
-- `AuthorInput`
-- `StatusInput`
-- `TypeInput`
-- `CreatedInput`
-- `UpdatedInput`
-- `PostSelect` (populates options with posts from `usePosts()`)
-- `ParentSelect` (populates options with comments from `useComments()`)
-
----
-
-## `asasvirtuais/user`
-
-Ready-to-use module for handling user profiles and authentication mapping (OAuth, Auth0, etc.).
-
-### Sub-modules
-
-- `asasvirtuais/user/schema`: The Zod schema and `User` type.
-- `asasvirtuais/user/provider`: `UsersProvider` and `useUsers` hook.
-- `asasvirtuais/user/fields`: Pre-built user fields inputs.
-
-### Schema
-
-```ts
-import z from 'zod'
-
-export const readable = z.object({
-    id: z.string(),
-    oauthId: z.string(),
-    name: z.string(),
-    username: z.string(),
-    email: z.string().email(),
-    role: z.string().default('subscriber'),
-    status: z.string().default('active'),
-    meta: z.any().nullable().optional(),
-    created: z.string().optional(),
-    updated: z.string().optional(),
-})
-
-export const writable = readable.pick({
-    oauthId: true,
-    name: true,
-    username: true,
-    email: true,
-    role: true,
-    status: true,
-    meta: true,
-    created: true,
-    updated: true,
-})
-```
-
-### Exported Components (`asasvirtuais/user/fields`)
-
-- `OauthIdInput`
-- `NameInput`
-- `UsernameInput`
-- `EmailInput`
-- `RoleInput`
-- `StatusInput`
-- `CreatedInput`
-- `UpdatedInput`
-

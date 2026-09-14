@@ -1,21 +1,6 @@
 import React from 'react'
 import { useState, useCallback, useEffect, useMemo } from 'react'
 
-type StoreProps<T> = {
-    [table: string]: (T & { id: string} )[]
-}
-function useStoreProvider<T>(props: StoreProps<T>) {
-    return Object.fromEntries(
-        Object.entries(props).map(
-            ([table, initial]) => [table, useIndex<T>({ initial: initial as T & { id: string} [] })]
-        )
-    ) as {
-        [table: string]: ReturnType<typeof useIndex<T>>
-    }
-}
-
-export const [StoreProvider, useStore] = createContextFromHook((useStoreProvider<any>))
-
 export function useAction<Props, Result, Defaults = Partial<Props>>(action: (props: Props) => Promise<Result>, {
     onSuccess, autoTrigger, ...props
 }: {
@@ -24,7 +9,6 @@ export function useAction<Props, Result, Defaults = Partial<Props>>(action: (pro
     autoTrigger?: boolean
 } = {}) {
     const [loading, setLoading] = useState<boolean>(false)
-    const [error, setError] = useState()
     const [result, setResult] = useState<Result>()
     const [defaults, setDefaults] = useState<Defaults>(props.defaults ?? {} as Defaults)
 
@@ -41,10 +25,6 @@ export function useAction<Props, Result, Defaults = Partial<Props>>(action: (pro
                 onSuccess(result)
             return result
 
-        } catch (error) {
-            // @ts-expect-error
-            setError(error)
-            throw error
         } finally {
             setLoading(false)
         }
@@ -58,7 +38,6 @@ export function useAction<Props, Result, Defaults = Partial<Props>>(action: (pro
     return {
         trigger,
         loading,
-        error,
         result,
         defaults,
         setDefaults,
