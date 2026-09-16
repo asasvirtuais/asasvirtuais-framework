@@ -2,7 +2,7 @@ import React from 'react'
 
 import { z } from 'zod'
 
-import { useState, useCallback, useEffect, createContext, useContext, useMemo } from 'react'
+import { useState, useCallback, useEffect, createContext, useContext } from 'react'
 
 import { useTable } from './table'
 import { TableSchema } from './interface'
@@ -41,7 +41,8 @@ export function useSingleProvider<TSchema extends TableSchema>({
         loading,
     }
 }
-const SingleRegistryContext = createContext<Record<string, ReturnType<typeof useSingleProvider<any>>> | undefined>(undefined)
+
+const Context = createContext<ReturnType<typeof useSingleProvider<any>> | undefined>(undefined)
 
 export function SingleProvider<TSchema extends TableSchema>({
     children, ...props
@@ -50,29 +51,21 @@ export function SingleProvider<TSchema extends TableSchema>({
     table: string
     schema: TSchema
     children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider<TSchema>>) => React.ReactNode)
-    nullIfNotFound?: boolean
 }) {
+
     const value = useSingleProvider<TSchema>(props)
-    const registry = useContext(SingleRegistryContext) ?? {}
 
-    const newRegistry = useMemo(() => {
-        return { ...registry, [props.table]: value }
-    }, [registry, props.table, value])
-
-    if (props.nullIfNotFound && !value.single) return null
     return (
-        <SingleRegistryContext.Provider value={newRegistry}>
+        <Context.Provider value={value}>
             {typeof children === 'function' ? (
                 children(value)
             ) : (
                 children
             )}
-        </SingleRegistryContext.Provider>
+        </Context.Provider>
     )
 }
 
 export function useSingle<TSchema extends TableSchema>(schema: TSchema, table: string) {
-    const registry = useContext(SingleRegistryContext)
-    if (!registry || !registry[table]) throw new Error(`useSingle('${table}') must be used within a SingleProvider for that table.`)
-    return registry[table] as ReturnType<typeof useSingleProvider<TSchema>>
+    return useContext(Context) as ReturnType<typeof useSingleProvider<TSchema>>
 }

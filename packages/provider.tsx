@@ -1,9 +1,17 @@
-'use client'
+import { createContext } from 'react'
 import { TableInterface } from './interface'
-import { createContextFromHook } from './hooks'
 
 export function useInterfaceProvider(tableInterface: TableInterface<any, any>) {
     return tableInterface
 }
 
-export const [InterfaceProvider, useInterface] = createContextFromHook(useInterfaceProvider)
+const Context = createContext<TableInterface<any, any> | undefined>(undefined)
+
+export function InterfaceProvider({ children, ...props }: React.PropsWithChildren<{ interface: TableInterface<any, any> }>) {
+    const context = useInterfaceProvider(props.interface)
+    return (
+        <Context.Provider value={context}>
+            {children}
+        </Context.Provider>
+    )
+}

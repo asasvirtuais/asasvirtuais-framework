@@ -46,10 +46,6 @@
       "types": "./packages/single.tsx",
       "default": "./packages/single.tsx"
     },
-    "./store": {
-      "types": "./packages/store.tsx",
-      "default": "./packages/store.tsx"
-    },
     "./provider": {
       "types": "./packages/provider.tsx",
       "default": "./packages/provider.tsx"
