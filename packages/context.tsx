@@ -1,8 +1,31 @@
 import { z } from 'zod'
-import React, { useEffect, createContext, useContext, useMemo } from 'react'
+import React, { useEffect, createContext, useContext } from 'react'
+
 import { useIndex, useAction as useAsyncAction } from './hooks'
 import { TableSchema, TableInterface } from './interface'
-import { useInterface } from './provider'
+
+export function useInterfaceProvider(tableInterface: TableInterface<any, any>) {
+    return tableInterface
+}
+
+const InterfaceContext = createContext<TableInterface<any, any> | undefined>(undefined)
+
+export function InterfaceProvider({ children, ...props }: React.PropsWithChildren<{ interface: TableInterface<any, any> }>) {
+    const context = useInterfaceProvider(props.interface)
+    return (
+        <InterfaceContext.Provider value={context}>
+            {children}
+        </InterfaceContext.Provider>
+    )
+}
+
+export function useInterface() {
+    const context = useContext(InterfaceContext)
+    if (!context)
+        throw new Error('useInterface must be used within an InterfaceProvider')
+    return context
+}
+
 
 export type TableProviderProps<TSchema extends TableSchema> = {
     table: string
@@ -48,7 +71,7 @@ export function useTableProvider<TSchema extends TableSchema>({
     }
 }
 
-const Context = createContext<Record<string, ReturnType<typeof useTableProvider<any>>> | undefined>(undefined)
+const TablesContext = createContext<Record<string, ReturnType<typeof useTableProvider<any>>> | undefined>(undefined)
 
 export function TablesProvider({ children, tables }: { children: React.ReactNode, tables: Record<string, TableSchema> }) {
 
@@ -62,11 +85,11 @@ export function TablesProvider({ children, tables }: { children: React.ReactNode
         })
     }
 
-    return <Context.Provider value={context}>{children}</Context.Provider>
+    return <TablesContext.Provider value={context}>{children}</TablesContext.Provider>
 }
 
 export function useTable<TSchema extends TableSchema>(table: string, schema: TSchema) {
-    const context = useContext(Context)
+    const context = useContext(TablesContext)
     if (!context)
         throw new Error('useTable must be used within a TablesProvider')
     const tableContext = context[table]

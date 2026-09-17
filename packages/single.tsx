@@ -1,11 +1,11 @@
-import React from 'react'
-
 import { z } from 'zod'
+
+import React from 'react'
 
 import { useState, useCallback, useEffect, createContext, useContext } from 'react'
 
-import { useTable } from './table'
 import { TableSchema } from './interface'
+import { useTable } from './context'
 
 export function useSingleProvider<TSchema extends TableSchema>({
     id, table, schema,

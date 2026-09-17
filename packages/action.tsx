@@ -69,7 +69,9 @@ export function ActionProvider<Params, Result>({ children, ...params }: ActionPr
 }) {
   const context = useActionProvider<Params, Result>(params)
   return (
-    <Context.Provider value={context}>{typeof children === 'function' ? children(context) : children}</Context.Provider>
+    <Context.Provider value={context}>
+      {typeof children === 'function' ? children(context) : children}
+    </Context.Provider>
   )
 }
 
