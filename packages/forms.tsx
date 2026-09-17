@@ -28,7 +28,7 @@ export function CreateForm<TSchema extends TableSchema>({ table, schema, default
         },
         [create, onSuccess]
     )
-
+    
     return (
         <FieldsProvider<Writable> defaults={defaults || ({} as Writable)}>
             {fields => (

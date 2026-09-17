@@ -10,8 +10,8 @@ export function useInterfaceProvider(tableInterface: TableInterface<any, any>) {
 
 const InterfaceContext = createContext<TableInterface<any, any> | undefined>(undefined)
 
-export function InterfaceProvider({ children, ...props }: React.PropsWithChildren<{ interface: TableInterface<any, any> }>) {
-    const context = useInterfaceProvider(props.interface)
+export function InterfaceProvider({ children, ...props }: React.PropsWithChildren<TableInterface<any, any>>) {
+    const context = useInterfaceProvider(props)
     return (
         <InterfaceContext.Provider value={context}>
             {children}
@@ -76,7 +76,6 @@ const TablesContext = createContext<Record<string, ReturnType<typeof useTablePro
 export function TablesProvider({ children, tables }: { children: React.ReactNode, tables: Record<string, TableSchema> }) {
 
     const context: Record<string, ReturnType<typeof useTableProvider<any>>> = {}
-
 
     for (const [table, schema] of Object.entries(tables)) {
         context[table] = useTableProvider({

@@ -3,7 +3,7 @@
  * It can error but doesn't hold an internal error state.
  * It receives params but doesn't manage a internal state of params.
  */
-import React, { createContext, useEffect } from 'react'
+import React, { createContext, useEffect, useMemo } from 'react'
 import { useCallback, useState } from 'react'
 
 export type ActionProps<Params, Result> = {
@@ -17,6 +17,8 @@ export type ActionProps<Params, Result> = {
 export function useActionProvider<Params, Result>(props: React.PropsWithChildren<ActionProps<Params, Result>>) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Result | null>(null)
+  const [errors, setErrors] = useState<Error[]>([])
+  const error = useMemo(() => errors[errors.length - 1] ?? null, [errors])
 
   const callback = useCallback(async (params: Params): Promise<Result> => {
 
@@ -31,6 +33,7 @@ export function useActionProvider<Params, Result>(props: React.PropsWithChildren
     } catch (error) {
       if (props.onError)
         props.onError(error as Error)
+      setErrors(prev => [...prev, error as Error])
       throw error
     } finally {
       setLoading(false)
@@ -59,6 +62,8 @@ export function useActionProvider<Params, Result>(props: React.PropsWithChildren
     submit,
     callback,
     params: props.params,
+    errors,
+    error,
   }
 }
 
