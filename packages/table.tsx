@@ -2,17 +2,18 @@ import { z } from 'zod'
 import React, { useEffect, createContext, useContext, useMemo } from 'react'
 import { useIndex, useAction as useAsyncAction } from './hooks'
 import { TableSchema, TableInterface } from './interface'
+import { useInterface } from './provider'
 
 export type TableProviderProps<TSchema extends TableSchema> = {
     table: string
     schema: TSchema
-    interface: TableInterface<z.infer<TSchema['readable']>, z.infer<TSchema['writable']>>
     asAbove?: Record<string, z.infer<TSchema['readable']>>
 }
 
 export function useTableProvider<TSchema extends TableSchema>({
-    table, schema, interface: { find, list, create, update, remove }, asAbove,
+    table, schema, asAbove,
 }: TableProviderProps<TSchema>) {
+    const { find, list, create, update, remove } = useInterface()
 
     type Readable = z.infer<TSchema['readable']>
 
@@ -20,7 +21,7 @@ export function useTableProvider<TSchema extends TableSchema>({
 
     useEffect(function soBelow() {
         index.setIndex((prev) => ({ ...prev, ...asAbove }))
-    }, [])
+    }, [asAbove])
 
     return {
         ...index,
@@ -47,26 +48,29 @@ export function useTableProvider<TSchema extends TableSchema>({
     }
 }
 
-const Registry = createContext<Record<string, ReturnType<typeof useTableProvider<any>>> | undefined>(undefined)
+const Context = createContext<Record<string, ReturnType<typeof useTableProvider<any>>> | undefined>(undefined)
 
-export function TableProvider<TSchema extends TableSchema>({ children, ...props }: React.PropsWithChildren<TableProviderProps<TSchema>>) {
+export function TablesProvider({ children, tables }: { children: React.ReactNode, tables: Record<string, TableSchema> }) {
 
-    const context = useTableProvider(props)
-    const registry = useContext(Registry) ?? {}
+    const context: Record<string, ReturnType<typeof useTableProvider<any>>> = {}
 
-    const newRegistry = useMemo(() => {
-        return { ...registry, [props.table]: context }
-    }, [registry, props.table, context])
 
-    return (
-        <Registry.Provider value={newRegistry}>
-            {children}
-        </Registry.Provider>
-    )
+    for (const [table, schema] of Object.entries(tables)) {
+        context[table] = useTableProvider({
+            table: table,
+            schema: schema,
+        })
+    }
+
+    return <Context.Provider value={context}>{children}</Context.Provider>
 }
 
 export function useTable<TSchema extends TableSchema>(table: string, schema: TSchema) {
-    const registry = useContext(Registry)
-    if (!registry || !registry[table]) throw new Error(`useTable('${table}') must be used within a TableProvider for that table.`)
-    return registry[table] as ReturnType<typeof useTableProvider<TSchema>>
+    const context = useContext(Context)
+    if (!context)
+        throw new Error('useTable must be used within a TablesProvider')
+    const tableContext = context[table]
+    if (!tableContext)
+        throw new Error(`Table ${table} is not provided in TablesProvider`)
+    return tableContext
 }

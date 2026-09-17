@@ -1,4 +1,4 @@
-import { createContext } from 'react'
+import { createContext, useContext } from 'react'
 import { TableInterface } from './interface'
 
 export function useInterfaceProvider(tableInterface: TableInterface<any, any>) {
@@ -15,3 +15,11 @@ export function InterfaceProvider({ children, ...props }: React.PropsWithChildre
         </Context.Provider>
     )
 }
+
+export function useInterface() {
+    const context = useContext(Context)
+    if (!context)
+        throw new Error('useInterface must be used within an InterfaceProvider')
+    return context
+}
+
