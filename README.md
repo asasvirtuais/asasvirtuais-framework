@@ -25,14 +25,19 @@ import { FieldsProvider } from 'asasvirtuais/fields'
 
 ### `ActionProvider` — async action state
 
+Tracks execution state (`loading`, `result`), an `errors` array of all caught errors, and an `error` state representing the most recent error (`Error | null`).
+
 ```tsx
 import { ActionProvider } from 'asasvirtuais/action'
 
 <ActionProvider params={{ id: todo.id }} action={archiveTodo} onResult={() => router.push('/')}>
   {({ submit, loading, error }) => (
-    <button onClick={submit} disabled={loading}>
-      {loading ? 'Archiving...' : 'Archive'}
-    </button>
+    <div>
+      <button onClick={submit} disabled={loading}>
+        {loading ? 'Archiving...' : 'Archive'}
+      </button>
+      {error && <p>{error.message}</p>}
+    </div>
   )}
 </ActionProvider>
 ```
@@ -152,14 +157,14 @@ The framework provides a schema-first CRUD layer where create, update, and remov
 app/
 ├── schema.ts             # All table schemas in one place
 ├── actions.ts            # Server actions — the backend
-├── providers.tsx         # App-level providers
+├── providers.tsx         # App-level providers (InterfaceProvider + TablesProvider)
 ├── layout.tsx
 ├── todos/
-│   ├── schema.ts          # Schema + types
+│   ├── schema.ts         # Schema + types
 │   ├── fields.tsx        # Input components
 │   ├── forms.tsx         # Create / Update / Delete / Filter forms
 │   ├── components.tsx    # Display components
-│   └── provider.tsx      # TableProvider + hook
+│   └── hooks.tsx         # useTodos hook (wrapping useTable)
 ```
 
 ---
@@ -294,28 +299,24 @@ Available operators: `$ne`, `$lt`, `$lte`, `$gt`, `$gte`, `$in`, `$nin`, `$or`, 
 
 ```tsx
 // app/providers.tsx
-import { InterfaceProvider, DatabaseProvider } from 'asasvirtuais/providers'
-import { TodosProvider } from '@/app/todos/provider'
-import { find, list, create, update, remove } from '@/app/actions'
+import { InterfaceProvider, TablesProvider } from 'asasvirtuais/context'
+import * as actions from '@/app/actions'
+import { schema as todosSchema } from '@/app/todos/schema'
+import { schema as tagsSchema } from '@/app/tags/schema'
 
 export default function AppProviders({ children }: { children: React.ReactNode }) {
   return (
-    <InterfaceProvider
-      find={find}
-      list={list}
-      create={create}
-      update={update}
-      remove={remove}
-    >
-      <DatabaseProvider>
-        <TodosProvider>
-          {children}
-        </TodosProvider>
-      </DatabaseProvider>
+    <InterfaceProvider {...actions}>
+      <TablesProvider tables={{ todos: todosSchema, tags: tagsSchema }}>
+        {children}
+      </TablesProvider>
     </InterfaceProvider>
   )
 }
 ```
+
+- **`InterfaceProvider`**: Receives `find`, `list`, `create`, `update`, and `remove` directly as props instead of an interface method, so you spread them (`<InterfaceProvider {...actions}>`).
+- **`TablesProvider`**: Configured collectively using the pattern `<TablesProvider tables={{ [tableA]: schemaA, tableB: schemaB }} />`. You no longer pass interface methods to the table provider; it automatically relies on the interfaces having already been passed to the `InterfaceProvider` above.
 
 ```tsx
 // app/layout.tsx
@@ -336,24 +337,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ---
 
-### 4. Model provider
+### 4. Model hook
+
+Since tables are provided collectively via `TablesProvider`, individual model providers are no longer needed. Simply define a model hook wrapping `useTable`:
 
 ```tsx
-// app/todos/provider.tsx
+// app/todos/hooks.tsx
 'use client'
-import { TableProvider, useTable, useInterface } from 'asasvirtuais/providers'
+import { useTable } from 'asasvirtuais/context'
 import { schema } from './schema'
 
 export function useTodos() {
   return useTable('todos', schema)
-}
-
-export function TodosProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <TableProvider table='todos' schema={schema} interface={useInterface()}>
-      {children}
-    </TableProvider>
-  )
 }
 ```
 
@@ -365,8 +360,8 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
 // app/todos/page.tsx
 'use client'
 import { useEffect } from 'react'
-import { useTodos } from './provider'
-import { SingleProvider } from 'asasvirtuais/providers'
+import { useTodos } from './hooks'
+import { SingleProvider } from 'asasvirtuais/single'
 import { schema } from './schema'
 import { TodoItem } from './components'
 import { CreateTodo } from './forms'
@@ -399,26 +394,19 @@ When `create` resolves, the item appears in `array` immediately. Same for `updat
 > **Architecture rule for agents and developers:**
 > When building new applications, prototypes, or feature demos, **always initiate apps directly with the framework from scratch**. Never build throwaway UI mockups using disconnected React state (`useState`) or temporary mock arrays. The UI demos should *already* be built on the framework architecture from day one.
 
-### The zero-backend bootstrap strategy: `asasvirtuais-dexie` + `asAbove`
+### The zero-backend bootstrap strategy: `asasvirtuais-dexie` + `TablesProvider`
 
 To prototype rapidly without setting up a remote backend or database:
 1. Use client-side IndexedDB via `asasvirtuais-dexie` as the `TableInterface`.
-2. Prime each `TableProvider` with initial mock/demo data passed to its `asAbove` prop.
-
-#### How `asAbove` works ('As above, so below')
-
-`TableProvider` accepts an optional `asAbove?: Record<string, Readable>` prop. On mount, it hydrates the reactive index immediately (`index.setIndex({ ...asAbove })`). This means:
-- All list views, single providers, and forms render instant data on the very first frame.
-- Any create, update, or remove operations execute against IndexedDB and stay synchronized across the entire UI through the reactive index.
-- No remote backend, credentials, or network connection required.
+2. Wrap your application with `InterfaceProvider` (spreading the adapter methods) and `TablesProvider` with your table schemas.
 
 ```tsx
 // app/providers.tsx
 'use client'
 import { dexieInterface } from 'asasvirtuais-dexie'
-import { InterfaceProvider, DatabaseProvider, TableProvider } from 'asasvirtuais/providers'
-import { schema as todosSchema, Readable as Todo } from './todos/schema'
-import { schema as tagsSchema, Readable as Tag } from './tags/schema'
+import { InterfaceProvider, TablesProvider } from 'asasvirtuais/context'
+import { schema as todosSchema } from './todos/schema'
+import { schema as tagsSchema } from './tags/schema'
 
 // 1. Client-side IndexedDB adapter matching the TableInterface contract
 const db = dexieInterface({
@@ -426,33 +414,12 @@ const db = dexieInterface({
   tags: tagsSchema,
 })
 
-// 2. Initial demo seed data, keyed by record id
-const demoTodos: Record<string, Todo> = {
-  '1': {
-    id: '1',
-    title: 'Explore asasvirtuais framework',
-    done: true,
-    author: 'agent',
-    createdAt: '2026-09-01T00:00:00Z',
-  },
-  '2': {
-    id: '2',
-    title: 'Bootstrap demo with asasvirtuais-dexie',
-    done: false,
-    author: 'agent',
-    createdAt: '2026-09-02T00:00:00Z',
-  },
-}
-
 export default function DemoProviders({ children }: { children: React.ReactNode }) {
   return (
     <InterfaceProvider {...db}>
-      <DatabaseProvider>
-        {/* Pass seed data to asAbove to immediately prime the reactive index */}
-        <TableProvider table='todos' schema={todosSchema} interface={db} asAbove={demoTodos}>
-          {children}
-        </TableProvider>
-      </DatabaseProvider>
+      <TablesProvider tables={{ todos: todosSchema, tags: tagsSchema }}>
+        {children}
+      </TablesProvider>
     </InterfaceProvider>
   )
 }
@@ -460,10 +427,9 @@ export default function DemoProviders({ children }: { children: React.ReactNode 
 
 ### Transitioning from demo to production
 
-Because your prototype already uses `TableProvider`, `CreateForm`, `SingleProvider`, and reactive hooks, transitioning to production requires **zero changes to your UI or business logic components**:
+Because your prototype already uses `TablesProvider`, `CreateForm`, `SingleProvider`, and reactive hooks, transitioning to production requires **zero changes to your UI or business logic components**:
 
 1. Replace `dexieInterface` in `AppProviders` with server actions (`makeSchemaTableInterface`) or `asasvirtuais-firebase`.
-2. Remove the `asAbove` seed prop once live data is served by the production database.
 
 ---
 
@@ -493,7 +459,7 @@ return array.map(todo => (
 Use `FilterForm` when you need pagination, live search, or results that belong to the component rather than the global index. Using `FilterForm` is better for pagination. Unlike `useTable.list`, the `FilterForm` only saves the result to the `result` prop (inside the child function) rather than updating the global index. Results only update when `submit` is called:
 
 ```tsx
-import { FilterForm } from 'asasvirtuais/form'
+import { FilterForm } from 'asasvirtuais/forms'
 import { schema } from './schema'
 
 <FilterForm table='todos' schema={schema} defaults={{ query: { done: false } }} autoTrigger>
@@ -515,7 +481,7 @@ import { schema } from './schema'
 ```
 
 > [!TIP]
-> **Combining with `SingleProvider`:** If you use `FilterForm`, you can combine it with `SingleProvider` by passing just the record's `id`. This ensures that the piece of data you want to present is always updated and reactive. For example, if your list query only fetches a subset of fields, but you need to show the full object details in a drawer or modal, wrapping the detail view in a `SingleProvider` will automatically fetch the complete object from the index if it's not already fully cached, while allowing the list itself to use the `result` array instead of the global `array`.
+> **Combining with `SingleProvider`:** If you use `FilterForm`, you can combine it with `SingleProvider` (from `asasvirtuais/single`) by passing just the record's `id`. This ensures that the piece of data you want to present is always updated and reactive. For example, if your list query only fetches a subset of fields, but you need to show the full object details in a drawer or modal, wrapping the detail view in a `SingleProvider` will automatically fetch the complete object from the index if it's not already fully cached, while allowing the list itself to use the `result` array instead of the global `array`.
 
 ---
 
@@ -528,7 +494,7 @@ Say a todo can be tagged, and the user needs to search and select a tag while cr
 ```tsx
 // app/todos/fields.tsx
 import { useFields } from 'asasvirtuais/fields'
-import { FilterForm } from 'asasvirtuais/form'
+import { FilterForm } from 'asasvirtuais/forms'
 import { schema as tagsSchema } from '@/app/tags/schema'
 
 export function TagSelectorField() {
@@ -568,7 +534,7 @@ Use it inside any form — it just works:
 
 ```tsx
 // app/todos/forms.tsx
-import { CreateForm } from 'asasvirtuais/form'
+import { CreateForm } from 'asasvirtuais/forms'
 import { schema } from './schema'
 import { TitleField, TagSelectorField } from './fields'
 
@@ -598,7 +564,7 @@ The `FilterForm` queries the `tags` table asynchronously. The `CreateForm` owns 
 `SingleProvider` makes a record available to all its descendants without prop drilling. When multiple components share one record, wrap them all in one provider:
 
 ```tsx
-import { SingleProvider, useSingle } from 'asasvirtuais/providers'
+import { SingleProvider, useSingle } from 'asasvirtuais/single'
 
 // Detail page
 <SingleProvider id={params.id} table='todos' schema={schema}>
@@ -615,6 +581,26 @@ function TodoDetail() {
 ```
 
 If the record isn't in the reactive index yet, `SingleProvider` fetches it automatically.
+
+### Nesting `SingleProvider`s
+
+If you're going to nest 2 `SingleProvider`s, you have to keep the parent object:
+
+```tsx
+<SingleProvider table='users' schema={usersSchema} id={currentUserId}>
+    {({single: user}) => (
+        <SingleProvider table='todos' schema={todosSchema} id={todoId}>
+            {({single: todo}) => (
+                // Here you have to use the user variable because useSingle('users') won't work anymore.
+                <div>
+                  <p>User: {user.name}</p>
+                  <p>Todo: {todo.title}</p>
+                </div>
+            )}
+        </SingleProvider>
+    )}
+</SingleProvider>
+```
 
 ---
 
@@ -658,7 +644,7 @@ There is no middleware or lifecycle configuration. Effects are code written arou
 | Table name | lowercase plural | `'todos'` |
 | Schema types | `Readable`, `Writable` | `type Readable = z.infer<...>` |
 | Field components | `{Field}Field` | `TitleField`, `DoneField` |
-| Provider | `{Model}sProvider` | `TodosProvider` |
+| Tables provider | `TablesProvider` | `<TablesProvider tables={{ todos: schema }} />` |
 | Hook | `use{Model}s()` | `useTodos()` |
 | Create form | `Create{Model}` | `CreateTodo` |
 | Update form | `Update{Model}` | `UpdateTodo` |
@@ -688,6 +674,8 @@ export const { find, list, create, update, remove } = makeSchemaTableInterface(s
 
 ```tsx
 // app/providers.tsx — wrap the methods passed to InterfaceProvider
+import { InterfaceProvider, TablesProvider } from 'asasvirtuais/context'
+
 const wrap = (fn: Function) => async (props: any) => {
   const result = await fn(props)
   if (result?.error) throw result.error
@@ -701,4 +689,8 @@ const wrap = (fn: Function) => async (props: any) => {
   update={wrap(update)}
   remove={wrap(remove)}
 >
+  <TablesProvider tables={{ todos: schema }}>
+    {children}
+  </TablesProvider>
+</InterfaceProvider>
 ```
