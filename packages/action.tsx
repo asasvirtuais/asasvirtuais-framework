@@ -1,3 +1,4 @@
+'use client'
 /**
  * Action: an async function that receives (props/params/attributes) and returns the promise of a result.
  * It can error but doesn't hold an internal error state.

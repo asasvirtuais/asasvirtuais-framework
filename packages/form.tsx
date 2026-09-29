@@ -1,3 +1,4 @@
+'use client'
 import React from 'react'
 import { FieldsProvider, FieldsProps, useFieldsProvider, useFields } from './fields'
 import { ActionProvider, ActionProps, useActionProvider, useAction } from './action'

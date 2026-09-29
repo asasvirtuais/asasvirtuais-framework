@@ -1,3 +1,4 @@
+'use client'
 import { useState, useCallback, useEffect, useMemo } from 'react'
 
 export function useAction<Props, Result, Defaults = Partial<Props>>(action: (props: Props) => Promise<Result>, {
