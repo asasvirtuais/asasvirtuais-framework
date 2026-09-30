@@ -1,7 +1,7 @@
 {
   "name": "asasvirtuais",
   "type": "module",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "directories": {
     "packages": "./packages"
   },
@@ -41,6 +41,10 @@
     "./context": {
       "types": "./packages/context.tsx",
       "default": "./packages/context.tsx"
+    },
+    "./registry": {
+      "types": "./packages/registry.tsx",
+      "default": "./packages/registry.tsx"
     },
     "./single": {
       "types": "./packages/single.tsx",

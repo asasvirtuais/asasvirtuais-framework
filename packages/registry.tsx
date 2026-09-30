@@ -1,9 +1,6 @@
 'use client'
 import { z } from 'zod'
-
-import React from 'react'
-
-import { useState, useCallback, useEffect, createContext, useContext } from 'react'
+import React, { useState, useCallback, useEffect, createContext, useContext, useMemo } from 'react'
 
 import { TableSchema } from './interface'
 import { useTable } from './context'
@@ -25,7 +22,7 @@ export function useSingleProvider<TSchema extends TableSchema>({
         find.trigger({ id })
             .then(setSingle)
             .finally(() => setLoading(false))
-    }, [loading])
+    }, [loading, id])
     useEffect(() => {
         if (!single)
             fetch()
@@ -43,7 +40,7 @@ export function useSingleProvider<TSchema extends TableSchema>({
     }
 }
 
-const Context = createContext<ReturnType<typeof useSingleProvider<any>> | undefined>(undefined)
+const SingleRegistry = createContext<Record<string, ReturnType<typeof useSingleProvider<any>>> | undefined>(undefined)
 
 export function SingleProvider<TSchema extends TableSchema>({
     children, ...props
@@ -52,21 +49,30 @@ export function SingleProvider<TSchema extends TableSchema>({
     table: string
     schema: TSchema
     children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider<TSchema>>) => React.ReactNode)
+    nullIfNotFound?: boolean
 }) {
-
     const value = useSingleProvider<TSchema>(props)
+    const registry = useContext(SingleRegistry) ?? {}
 
+    const newRegistry = useMemo(() => {
+        return { ...registry, [props.table]: value }
+    }, [registry, props.table, value])
+
+    if (props.nullIfNotFound && !value.single) return null
     return (
-        <Context.Provider value={value}>
+        <SingleRegistry.Provider value={newRegistry}>
             {typeof children === 'function' ? (
                 children(value)
             ) : (
                 children
             )}
-        </Context.Provider>
+        </SingleRegistry.Provider>
     )
 }
 
-export function useSingle<TSchema extends TableSchema>(schema: TSchema) {
-    return useContext(Context) as ReturnType<typeof useSingleProvider<TSchema>>
+export function useSingle<TSchema extends TableSchema>(schema: TSchema, table: string) {
+    const registry = useContext(SingleRegistry)
+    if (!registry || !registry[table])
+        throw new Error(`useSingle('${table}') must be used within a SingleProvider for that table.`)
+    return registry[table] as ReturnType<typeof useSingleProvider<TSchema>>
 }
