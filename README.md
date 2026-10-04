@@ -208,7 +208,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 'use client'
 import { CreateForm, UpdateForm, FilterForm } from 'asasvirtuais/forms'
 import { SingleProvider, useSingle } from 'asasvirtuais/registry'
-import { schema } from './schema'
+import { schema } from '@/packages/todos/schema'
 
 export default function TodosPage() {
   return (
