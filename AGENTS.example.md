@@ -320,7 +320,8 @@ Going to production means passing the CRUD file's actions instead. The UI stays 
    - `index.tsx`: a server component. It's usually the high-level version of the component, fetching on the server and
      rendering `component.tsx`, and often goes inside `Suspense`. It is never a barrel file: import each file from its
      own path.
-   - `cache.tsx`: cached server-side reads.
+   - `cache.tsx`: `'use cache'`. Receives the params the cache depends on (e.g. from the URL) and renders `index.tsx`
+     with them, so caching is decided here rather than in the fetching layer.
    - `context.tsx`, `hooks.tsx`: shared context and local state, when needed.
 
    Code used only by a component stays in its directory. A component shared by several pages lives with their closest
