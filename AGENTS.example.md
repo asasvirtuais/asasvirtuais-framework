@@ -26,6 +26,7 @@ follows it. Most of an app is forms on top of tables.
 app/
 ├── schema.ts             # all table schemas
 ├── actions.ts            # 'use server' — the CRUD interface
+├── db.ts                 # the raw database interface (Prisma, Firestore...)
 ├── providers.tsx         # InterfaceProvider
 └── [route]/
     ├── layout.tsx        # TablesProvider with the tables this route uses
@@ -38,9 +39,21 @@ packages/
     ├── forms.tsx         # Create{Model}, Update{Model}, Filter{Model}s
     ├── components.tsx    # {Model}Item, Single{Model}
     ├── providers.tsx     # {Model}Provider
-    └── hooks.tsx         # use{Model}s(), use{Model}()
+    ├── hooks.tsx         # use{Model}s(), use{Model}()
+    └── middleware.ts     # the table's authorization and side effects, written last
 lib/                      # small shared files, only once code repeats
 ```
+
+In a larger app the database access is a package of its own. Here it's `app/db.ts` for simplicity.
+
+## Building an app
+
+1. **Data modeling, by feature.** Each feature's tables become packages, starting with `packages/{model}/schema.ts`.
+2. **UI layout and routing.** Routes, layouts and page skeletons, with the `TablesProvider` each one needs.
+3. **Business logic.** The forms get assembled: `CreateForm`, `UpdateForm`, nested and multi-step `Form`s, and the
+   component actions they call.
+4. **Workflow validation.** With the UI settled and the features clear, the workflows are checked end to end, long-running
+   ones included, and each table gets its [middleware](#table-middleware).
 
 ---
 
@@ -94,48 +107,23 @@ export const schema = { todos, tags }
 
 ### The CRUD file
 
-`app/actions.ts` is the backend. Pre-flight work (authentication, authorization, validation, default values) goes
-before the database call. Side effects (emails, webhooks, records that must follow this one) go after it. Each method
-receives the `table` it was called for.
+`app/actions.ts` exposes the database to the forms. Until the [table middleware](#table-middleware) is written, it
+passes straight to the raw interface in `app/db.ts`:
 
 ```ts
 // app/actions.ts
 'use server'
-import { makeSchemaTableInterface } from 'asasvirtuais/interface'
 import { action } from '@/lib/action'
-import { schema } from './schema'
+import { db } from './db'
 
-const crud = makeSchemaTableInterface(schema, null, {
-  find: async (props) => db.find(props),
-  list: async (props) => db.list(props),
-  create: async (props) => {
-    // pre-flight
-    const result = await db.create(props)
-    // side effects
-    return result
-  },
-  update: async (props) => {
-    // pre-flight
-    const result = await db.update(props)
-    // side effects
-    return result
-  },
-  remove: async (props) => {
-    // pre-flight
-    const result = await db.remove(props)
-    // side effects
-    return result
-  },
-})!
-
-export const find = action(crud.find)
-export const list = action(crud.list)
-export const create = action(crud.create)
-export const update = action(crud.update)
-export const remove = action(crud.remove)
+export const find = action(db.find)
+export const list = action(db.list)
+export const create = action(db.create)
+export const update = action(db.update)
+export const remove = action(db.remove)
 ```
 
-The row a handler returns is what lands in the index.
+Each method receives the `table` it was called for. The row it returns is what lands in the index.
 
 ### Errors
 
@@ -277,8 +265,77 @@ If the user triggers each operation, they are steps. Each one is its own form, a
 `onResult`, `await form.callback(...)`) opens the next.
 
 If one operation has to follow another automatically (an order records a payment), the second one is a side effect in
-the first one's CRUD handler, in the same transaction. A client could skip a second request or be interrupted
+the first table's middleware, in the same transaction. A client could skip a second request or be interrupted
 halfway. Views of the other table refetch with `list.trigger(...)` in `onSuccess`.
+
+---
+
+## Table middleware
+
+Business rules are read by domain, so each table keeps its own in `packages/{model}/middleware.ts`. The middleware
+wraps the raw database interface with `makeSchemaTableInterface`, passing the table instead of `null`:
+
+```ts
+// packages/todos/middleware.ts
+import { makeSchemaTableInterface } from 'asasvirtuais/interface'
+import { db } from '@/app/db'
+import { schema } from './schema'
+
+export const todos = makeSchemaTableInterface({ todos: schema }, 'todos', {
+  find: (props) => db.find(props),
+  list: (props) => db.list(props),
+  create: async (props) => {
+    // pre-flight: authorization
+    const result = await db.create(props)
+    // side effects
+    return result
+  },
+  update: async (props) => {
+    // pre-flight: authorization
+    const result = await db.update(props)
+    // side effects
+    return result
+  },
+  remove: async (props) => {
+    // pre-flight: authorization
+    const result = await db.remove(props)
+    // side effects
+    return result
+  },
+})!
+```
+
+`app/actions.ts` then only switches on the table and calls its middleware:
+
+```ts
+// app/actions.ts
+'use server'
+import type { FindProps, ListProps, CreateProps, UpdateProps, RemoveProps } from 'asasvirtuais/interface'
+import { action } from '@/lib/action'
+import { todos } from '@/packages/todos/middleware'
+import { tags } from '@/packages/tags/middleware'
+
+function middleware(table?: string) {
+  switch (table) {
+    case 'todos': return todos
+    case 'tags': return tags
+    default: throw new Error(`Unknown table: ${table}`)
+  }
+}
+
+export const find = action(async (props: FindProps) => middleware(props.table).find(props))
+export const list = action(async (props: ListProps) => middleware(props.table).list(props))
+export const create = action(async (props: CreateProps) => middleware(props.table).create(props))
+export const update = action(async (props: UpdateProps) => middleware(props.table).update(props))
+export const remove = action(async (props: RemoveProps) => middleware(props.table).remove(props))
+```
+
+Pre-flight is for authorization rules only. An LLM call is never a pre-flight step: it gets its own action, and its
+result goes through a form like any other data. Keeping business logic out of the CRUD keeps each one readable.
+
+The middleware is the last part of an app to be written. During prototyping these rules change with every iteration of
+the UI, so they wait until the UI is settled and the features are clear (stage 4 of
+[Building an app](#building-an-app)). Until then, `app/actions.ts` passes straight to `app/db.ts`.
 
 ---
 
@@ -302,10 +359,11 @@ Going to production means passing the CRUD file's actions instead. The UI stays 
 2. **Use the framework forms for database operations**, including single-column updates. A flag, a status or a name is
    an `UpdateForm` with one field, not a custom server action. The reactive index updates the UI, so there's no need
    for `useState` copies of rows, manual `set` calls, or revalidation.
-3. **Writes go through the CRUD.** Their checks and side effects live in `app/actions.ts`. Each extra server action that
-   writes is another way into the database, with its own copy of the checks or none.
+3. **Writes go through the CRUD.** Their authorization and side effects live in each table's `middleware.ts`. Each
+   extra server action that writes is another way into the database, with its own copy of the checks or none.
 4. **Other server actions do one thing.** LLM calls, previews, external APIs and server-side reads live in the
-   `actions.tsx` of the component that uses them. When their result should be saved, it goes into a form.
+   `actions.tsx` of the component that uses them, one call per action. When their result should be saved, it goes into
+   a form.
 5. **Fail fast, return errors.** Throw `new Error('Unauthorized')` / `new Error('Forbidden')`, and call `notFound()`
    for missing records. Every server action is wrapped with `action(...)`, client components call `unwrap(actions)`,
    and server code calling another action uses `ok(await name(...))`.

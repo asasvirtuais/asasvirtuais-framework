@@ -48,7 +48,7 @@ With asasvirtuais:
 </UpdateForm>
 ```
 
-The permission check lives once in the CRUD file. When the update resolves, every view of that todo updates.
+The permission check lives once, in the `todos` middleware. When the update resolves, every view of that todo updates.
 
 ---
 
@@ -58,8 +58,8 @@ The permission check lives once in the CRUD file. When the update resolves, ever
   follows. You don't need `useState` copies, `revalidatePath`, or refetching.
 - **Forms do the work.** `Form` pairs fields with an async action, and nests into multi-step flows. `CreateForm`,
   `UpdateForm` and `FilterForm` do the same against your tables.
-- **Business rules in one file.** All database writes go through one CRUD interface, so permissions and validation
-  are written once instead of being repeated in every action.
+- **Business rules by table.** All database writes go through one CRUD interface, and each table's authorization
+  lives in its own middleware instead of being repeated in every action.
 - **One obvious way.** With fewer choices to make, an LLM writes the same structure every time and you review less.
 
 ---
@@ -159,24 +159,22 @@ export const schema = { todos }
 
 ### The CRUD file
 
-Five server actions make up the whole backend. Auth, validation, server-filled fields and side effects all go here.
+Five server actions make up the whole backend. They pass straight to your database until the
+[table middleware](#table-middleware) is written.
 
 ```ts
 // app/actions.ts
 'use server'
-import { makeSchemaTableInterface } from 'asasvirtuais/interface'
-import { schema } from './schema'
+import { db } from './db'      // the raw interface over your database: Prisma, Firestore...
 
-export const { find, list, create, update, remove } = makeSchemaTableInterface(schema, null, {
-  find:   async (props) => db.find(props),
-  list:   async (props) => db.list(props),
-  create: async (props) => { /* check */ const row = await db.create(props); /* side effects */ return row },
-  update: async (props) => { /* check */ return db.update(props) },
-  remove: async (props) => { /* check */ return db.remove(props) },
-})!
+export const { find, list, create, update, remove } = db
 ```
 
 Each method receives `table` along with its props: `{ id }`, `{ query }`, `{ data }` or `{ id, data }`.
+
+Next.js hides the message of an error a server action throws in production, so server actions return
+`{ error: message }` instead, and the client throws it again for the forms to display.
+[`AGENTS.example.md`](./AGENTS.example.md#errors) has the small wrapper that does both.
 
 ### Providers
 
@@ -256,30 +254,70 @@ For deletion, `useTable('todos', schema).remove.trigger({ id })` works on its ow
 
 ---
 
-## Business rules in one place
-
-Every server action that writes to the database is another way into it, and another place where a check can be
-forgotten. In asasvirtuais, writes go through the CRUD file, so whatever surrounds an operation is written once:
-
-- **Pre-flight:** authentication, authorization, validation and default values, before the database call. This is
-  the app's middleware.
-- **Side effects:** emails, webhooks, and the records that must follow this one, after the database call.
-
-Next.js hides the message of an error a server action throws in production, so the CRUD actions (and any other server
-action) return `{ error: message }` instead, and the client throws it again for the forms to display.
-[`AGENTS.example.md`](./AGENTS.example.md#errors) has the small wrapper that does both.
-
----
-
 ## Orchestrating operations
 
 Some features touch several tables. Two patterns cover them:
 
 - **Steps the user takes.** Each step is its own form, and one step's result (`onSuccess`, `onResult`, or
-  `await form.callback(...)`) opens the next. Each step is a normal operation, so its checks sit in the CRUD file
-  with the rest.
+  `await form.callback(...)`) opens the next. Each step is a normal operation, so its rules sit in its table's
+  middleware.
 - **Things that must follow automatically.** An order that records a payment shouldn't depend on the client making a
-  second request. The payment runs as a side effect in the order's `create` handler, inside the same transaction.
+  second request. The payment runs as a side effect in the `orders` middleware's `create`, inside the same transaction.
+
+---
+
+## How an app gets built
+
+1. **Data modeling, by feature.** Each feature's tables become packages: `packages/{model}/schema.ts`.
+2. **UI layout and routing.** Routes, layouts and page skeletons.
+3. **Business logic.** The forms get assembled: `CreateForm`, `UpdateForm`, nested and multi-step `Form`s.
+4. **Workflow validation.** With the UI settled, the workflows are checked end to end, long-running ones included, and
+   each table gets its middleware.
+
+---
+
+## Table middleware
+
+Nobody reads every table's business rules together. You read them by domain. So each model gets a `middleware.ts`
+that wraps the raw database interface for its table, by passing the table to `makeSchemaTableInterface`:
+
+```ts
+// packages/todos/middleware.ts
+export const todos = makeSchemaTableInterface({ todos: schema }, 'todos', {
+  find: (props) => db.find(props),
+  list: (props) => db.list(props),
+  create: async (props) => {
+    // pre-flight: authorization
+    const result = await db.create(props)
+    // side effects
+    return result
+  },
+  update: async (props) => { /* pre-flight */ const result = await db.update(props); /* side effects */ return result },
+  remove: async (props) => { /* pre-flight */ const result = await db.remove(props); /* side effects */ return result },
+})!
+```
+
+The CRUD file then switches on the table and calls its middleware:
+
+```ts
+// app/actions.ts
+function middleware(table?: string) {
+  switch (table) {
+    case 'todos': return todos
+    case 'tags': return tags
+    default: throw new Error(`Unknown table: ${table}`)
+  }
+}
+
+export const create = async (props: CreateProps) => middleware(props.table).create(props)
+// find, list, update and remove the same way
+```
+
+Pre-flight is for authorization only. LLM calls and other business logic get actions of their own instead of being
+merged into the CRUD.
+
+This is the last part of an app to be written. While the app is being prototyped these rules change with every
+iteration of the UI, so they wait until the UI is settled and the features are clear.
 
 ---
 
@@ -315,4 +353,4 @@ implements `find`, `list`, `create`, `update` and `remove` works.
 ## For coding agents
 
 [`AGENTS.example.md`](./AGENTS.example.md) explains how to build with asasvirtuais: the principles behind it, the
-project and component-directory structure, the CRUD file and error handling, form patterns, orchestration, and coding rules. Copy it into your app as `AGENTS.md`.
+project and component-directory structure, the build stages, the CRUD file, table middleware and error handling, form patterns, orchestration, and coding rules. Copy it into your app as `AGENTS.md`.
