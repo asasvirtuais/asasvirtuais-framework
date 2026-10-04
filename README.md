@@ -1,34 +1,66 @@
 # asasvirtuais
 
-**Full-stack React where you never manage state by hand.**
+A React framework made of architectural decisions, so you (or your LLM) can skip making them and go straight to the
+feature.
 
-Define a schema, write one CRUD file, and drop in forms. Every create, update and delete lands in a reactive index,
-and every list, filter and detail view showing that table updates by itself. There is no `revalidatePath`, no
-refetching, and no `setState` copies of your rows.
+Most stacks leave the same questions open for every feature: where the state lives, how a form reaches the server, how
+lists refresh after a save, where the permission check goes. An LLM answers them again each time, and writes the
+boilerplate that comes with each answer. asasvirtuais answers them once. A feature becomes a form on top of a table,
+and code gets written several times faster.
+
+---
+
+## What it looks like
+
+Marking a todo as done, in a typical Next.js app:
+
+```tsx
+// actions.ts
+'use server'
+export async function setTodoDone(id: string, done: boolean) {
+  const user = await currentUser()
+  const todo = await db.todos.find(id)
+  if (todo.author !== user.id) throw new Error('Forbidden')
+  await db.todos.update(id, { done })
+  revalidatePath('/todos')
+}
+
+// component
+const [done, setDone] = useState(todo.done)
+const [pending, startTransition] = useTransition()
+
+<input type='checkbox' checked={done} disabled={pending} onChange={() => {
+  setDone(!done)
+  startTransition(() => setTodoDone(todo.id, !done))
+}} />
+```
+
+That gets repeated for every field of every table, and each copy carries its own permission check.
+
+With asasvirtuais:
 
 ```tsx
 <UpdateForm table='todos' schema={schema} id={todo.id}>
-  {toggle => (
-    <input type='checkbox' checked={todo.done} onChange={() => toggle.callback({ done: !todo.done })} />
+  {form => (
+    <input type='checkbox' checked={todo.done} disabled={form.loading}
+      onChange={() => form.callback({ done: !todo.done })} />
   )}
 </UpdateForm>
 ```
 
-That checkbox writes to your database through your own server code, checks permissions, and updates every view
-of that todo across the page. It takes no extra code.
+The permission check lives once in the CRUD file. When the update resolves, every view of that todo updates.
 
 ---
 
-## Why
+## Why it's faster
 
-- **No manual state.** Writes go through a generic CRUD interface, and the returned row syncs the UI.
-- **One file for the rules.** `app/actions.ts` holds every mutation rule in the app: who may create, update or remove
-  what, and what happens automatically afterwards. Reading it tells you how the app behaves.
-- **Organised by feature, not by layer.** Each model has its schema, fields, forms and components in one folder.
-- **Backend-agnostic.** Start on IndexedDB with no server, then switch to server actions, Firestore or anything that
-  implements five functions, without touching the UI.
-- **Built for LLM-written apps.** A small set of patterns that an agent can follow exactly. See
-  [`AGENTS.example.md`](./AGENTS.example.md).
+- **No manual state.** Operations return rows into a reactive index, and every list and detail view of that table
+  follows. You don't need `useState` copies, `revalidatePath`, or refetching.
+- **Forms do the work.** `Form` pairs fields with an async action, and nests into multi-step flows. `CreateForm`,
+  `UpdateForm` and `FilterForm` do the same against your tables.
+- **Business rules in one file.** All database writes go through one CRUD interface, so permissions and validation
+  are written once instead of being repeated in every action.
+- **One obvious way.** With fewer choices to make, an LLM writes the same structure every time and you review less.
 
 ---
 
@@ -38,7 +70,7 @@ of that todo across the page. It takes no extra code.
 pnpm add asasvirtuais zod
 ```
 
-Using an AI coding agent? Copy the agent guide into your app:
+Building with a coding agent? Start your `AGENTS.md` from the guide that ships with the package:
 
 ```sh
 cp node_modules/asasvirtuais/AGENTS.example.md AGENTS.md
@@ -46,11 +78,69 @@ cp node_modules/asasvirtuais/AGENTS.example.md AGENTS.md
 
 ---
 
-## A five-minute tour
+## Form
 
-### 1. Schema
+`Form` holds a set of fields and an async action. The render prop gets both.
 
-Each table has `readable` (what comes out of the database) and `writable` (what a user may send).
+```tsx
+import { Form } from 'asasvirtuais/form'
+
+<Form defaults={{ email: '', password: '' }} action={login} onResult={() => router.push('/')}>
+  {login => (
+    <form onSubmit={login.submit}>
+      <input value={login.fields.email} onChange={e => login.setField('email', e.target.value)} />
+      <input type='password' value={login.fields.password} onChange={e => login.setField('password', e.target.value)} />
+      <button disabled={login.loading}>Log in</button>
+      {login.error && <p>{login.error.message}</p>}
+    </form>
+  )}
+</Form>
+```
+
+Render props: `fields`, `setField`, `setFields`, `submit`, `callback(params)`, `loading`, `result`, `error`, `errors`.
+
+`FieldsProvider` (`asasvirtuais/fields`) and `ActionProvider` (`asasvirtuais/action`) are the two halves of `Form`.
+You can use either one on its own.
+
+### Nested and multi-step forms
+
+Naming the render prop after what the form represents (`order`, `zip`) lets nested forms share one closure. The inner
+form can run its own async step and write the result into the outer one:
+
+```tsx
+<Form defaults={{ item: '', address: '' }} action={placeOrder} onResult={order => router.push(`/orders/${order.id}`)}>
+  {order => (
+    <form onSubmit={order.submit}>
+      <input value={order.fields.item} onChange={e => order.setField('item', e.target.value)} />
+
+      <Form defaults={{ zip: '' }} action={lookupZip} onResult={a => order.setField('address', `${a.street}, ${a.city}`)}>
+        {zip => (
+          <div>
+            <input value={zip.fields.zip} onChange={e => zip.setField('zip', e.target.value)} />
+            <button type='button' onClick={zip.submit} disabled={zip.loading}>
+              {zip.loading ? 'Looking up…' : 'Fill address'}
+            </button>
+          </div>
+        )}
+      </Form>
+
+      {order.fields.address && <p>Shipping to {order.fields.address}</p>}
+      <button type='submit' disabled={order.loading}>Place order</button>
+    </form>
+  )}
+</Form>
+```
+
+`order.loading` and `zip.loading` are independent. You can add steps the same way: validation, AI drafts, address
+lookups, or anything that feeds a field before the outer form submits.
+
+---
+
+## CRUD
+
+### Schema
+
+Each table has a `readable` schema (what the database returns) and a `writable` schema (what a user may send).
 
 ```ts
 // app/todos/schema.ts
@@ -67,9 +157,9 @@ import { schema as todos } from './todos/schema'
 export const schema = { todos }
 ```
 
-### 2. The CRUD file
+### The CRUD file
 
-Your backend consists of five server actions. Auth, validation, server-filled fields and after-effects all go here.
+Five server actions make up the whole backend. Auth, validation, server-filled fields and side effects all go here.
 
 ```ts
 // app/actions.ts
@@ -80,16 +170,15 @@ import { schema } from './schema'
 export const { find, list, create, update, remove } = makeSchemaTableInterface(schema, null, {
   find:   async (props) => db.find(props),
   list:   async (props) => db.list(props),
-  create: async (props) => { /* check rules */ return db.create(props) /* after-effects */ },
-  update: async (props) => { /* check rules */ return db.update(props) },
-  remove: async (props) => { /* check rules */ return db.remove(props) },
+  create: async (props) => { /* check */ const row = await db.create(props); /* side effects */ return row },
+  update: async (props) => { /* check */ return db.update(props) },
+  remove: async (props) => { /* check */ return db.remove(props) },
 })!
 ```
 
-[`AGENTS.example.md`](./AGENTS.example.md#the-crud-file) shows the full pattern: a per-table
-`{ create, update, remove }` rule map, transactions, and automatic consequences.
+Each method receives `table` along with its props: `{ id }`, `{ query }`, `{ data }` or `{ id, data }`.
 
-### 3. Providers
+### Providers
 
 ```tsx
 // app/providers.tsx
@@ -103,7 +192,7 @@ export default function AppProviders({ children }: { children: React.ReactNode }
 ```
 
 ```tsx
-// app/todos/layout.tsx: each route mounts only the tables it needs
+// app/todos/layout.tsx: each route mounts the tables it uses
 'use client'
 import { TablesProvider } from 'asasvirtuais/context'
 import { schema } from './schema'
@@ -113,11 +202,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 }
 ```
 
-### 4. UI
+### Forms and records
 
 ```tsx
 'use client'
-import { CreateForm, FilterForm } from 'asasvirtuais/forms'
+import { CreateForm, UpdateForm, FilterForm } from 'asasvirtuais/forms'
 import { SingleProvider, useSingle } from 'asasvirtuais/registry'
 import { schema } from './schema'
 
@@ -146,76 +235,56 @@ export default function TodosPage() {
 
 function TodoItem() {
   const { single: todo } = useSingle(schema, 'todos')
-  return <p>{todo.title}</p>
+  return (
+    <UpdateForm table='todos' schema={schema} id={todo.id}>
+      {form => (
+        <label>
+          <input type='checkbox' checked={todo.done} onChange={() => form.callback({ done: !todo.done })} />
+          {todo.title}
+        </label>
+      )}
+    </UpdateForm>
+  )
 }
 ```
 
-When a write resolves, the row is updated in the index and every `SingleProvider` for it re-renders.
+`SingleProvider` fetches the record if it isn't in the index yet, and any descendant can read it with `useSingle`.
+For deletion, `useTable('todos', schema).remove.trigger({ id })` works on its own or wrapped in an `ActionProvider`.
+
+`list` queries are FeathersJS-style: field matches, `$ne $lt $lte $gt $gte $in $nin $or $and`, and
+`$limit $skip $sort $select`.
 
 ---
 
-## How work flows
+## Business rules in one place
 
-asasvirtuais apps have one write path: **the client writes rows, and the CRUD file decides whether it may.**
+Every server action that writes to the database is another way into it, and another place where a check can be
+forgotten. With asasvirtuais the CRUD file is the only code that writes. Its handlers can look up a per-table set of
+rules, so who may create, update or remove what reads as a single list:
 
-**One click is one row.** Approving, renaming, archiving and toggling are each an `UpdateForm` on one field. They are
-not custom endpoints.
+```ts
+const allowed = {
+  todos: {
+    create: ({ user }) => !!user,
+    update: ({ user, current }) => current.author === user.id,
+    remove: ({ user, current }) => current.author === user.id,
+  },
+}
+```
 
-**Workflows are steps.** When an operation spans several tables and the user drives each part, each part is its own
-CRUD write, and the result of one opens the next: *click, create, result, click, update, result.* Every step's rule
-sits in the CRUD file with all the others.
-
-| Step | CRUD write |
-|---|---|
-| Player joins | `create participants { mission, character }` |
-| Emissary approves | `update participants { status: 'approved' }` |
-| Emissary starts | `update missions { status: 'active' }` |
-
-**Consequences live on the server.** When a second write must happen automatically (buying a card debits the
-wallet), the user's write records the intent, and the consequence runs in the same server handler and the same
-transaction. The client never chains them, because that would be untrustworthy, non-atomic and racy.
-
-**Drafts are not writes.** LLM drafts, previews and lookups are plain async functions run through `Form`. Their
-results fill a `CreateForm`, which saves them.
+[`AGENTS.example.md`](./AGENTS.example.md#the-crud-file) shows a complete version with transactions and side effects.
 
 ---
 
-## Primitives
+## Orchestrating operations
 
-The CRUD forms are built on three primitives you can use on their own.
+Some features touch several tables. Two patterns cover them:
 
-```tsx
-import { FieldsProvider } from 'asasvirtuais/fields'   // field state
-import { ActionProvider } from 'asasvirtuais/action'   // async state: loading, result, error
-import { Form } from 'asasvirtuais/form'               // both together
-
-<Form defaults={{ email: '', password: '' }} action={login} onResult={user => router.push('/')}>
-  {login => (
-    <form onSubmit={login.submit}>
-      <input value={login.fields.email} onChange={e => login.setField('email', e.target.value)} />
-      <input type='password' value={login.fields.password} onChange={e => login.setField('password', e.target.value)} />
-      <button disabled={login.loading}>Log in</button>
-      {login.error && <p>{login.error.message}</p>}
-    </form>
-  )}
-</Form>
-```
-
-Name render props after what the form represents (`login`, `order`, `zip`). Nested forms and chained steps then sit
-side by side in one closure without collisions:
-
-```tsx
-<Form defaults={{ address: '' }} action={placeOrder}>
-  {order => (
-    <Form defaults={{ zip: '' }} action={lookupZip} onResult={a => order.setField('address', a.street)}>
-      {zip => /* zip.fields, order.fields, zip.loading, order.loading ... */ null}
-    </Form>
-  )}
-</Form>
-```
-
-Every form and action exposes `fields`, `setField`, `setFields`, `submit`, `callback(params)`, `loading`, `result`,
-`error` and `errors`.
+- **Steps the user takes.** Each step is its own form, and one step's result (`onSuccess`, `onResult`, or
+  `await form.callback(...)`) opens the next. Each step is a normal operation, so its rule sits in the CRUD file
+  with the rest.
+- **Things that must follow automatically.** An order that records a payment shouldn't depend on the client making a
+  second request. The payment runs as a side effect in the order's `create` handler, inside the same transaction.
 
 ---
 
@@ -227,7 +296,10 @@ import { dexieInterface } from 'asasvirtuais-dexie'
 <InterfaceProvider {...dexieInterface(schema)}>{children}</InterfaceProvider>
 ```
 
-The app runs on IndexedDB. Swap in `app/actions.ts` later, and nothing in the UI changes.
+Everything runs on IndexedDB. Swap in `app/actions.ts` when you're ready, and the UI stays the same.
+
+Other adapters: [`asasvirtuais-firebase`](https://www.npmjs.com/package/asasvirtuais-firebase). Anything that
+implements `find`, `list`, `create`, `update` and `remove` works.
 
 ---
 
@@ -235,25 +307,17 @@ The app runs on IndexedDB. Swap in `app/actions.ts` later, and nothing in the UI
 
 | Import | Exports |
 |---|---|
+| `asasvirtuais/form` | `Form`, `useForm` |
 | `asasvirtuais/fields` | `FieldsProvider`, `useFields`, `useField` |
 | `asasvirtuais/action` | `ActionProvider`, `useAction` |
-| `asasvirtuais/form` | `Form`, `useForm` |
 | `asasvirtuais/forms` | `CreateForm`, `UpdateForm`, `FilterForm`, `useCreateForm`, `useUpdateForm`, `useFilterForm` |
 | `asasvirtuais/context` | `InterfaceProvider`, `TablesProvider`, `useTable` |
 | `asasvirtuais/registry` | `SingleProvider`, `useSingle` |
 | `asasvirtuais/interface` | `makeSchemaTableInterface`, `TableInterface`, `Query`, `TableSchema` |
 
-`list` queries are FeathersJS-style: field matches, `$ne $lt $lte $gt $gte $in $nin $or $and`, and
-`$limit $skip $sort $select`.
-
-Adapters: [`asasvirtuais-dexie`](https://www.npmjs.com/package/asasvirtuais-dexie) (IndexedDB),
-[`asasvirtuais-firebase`](https://www.npmjs.com/package/asasvirtuais-firebase) (Firestore). Anything implementing
-`find`, `list`, `create`, `update` and `remove` works.
-
 ---
 
-## For agents
+## For coding agents
 
-[`AGENTS.example.md`](./AGENTS.example.md) is the complete rulebook for building an asasvirtuais app: numbered rules,
-a decision procedure for every kind of write, the CRUD rule map, workflow and consequence patterns, and a table of
-common mistakes and their corrections. Copy it to your app as `AGENTS.md`.
+[`AGENTS.example.md`](./AGENTS.example.md) explains how to build with asasvirtuais: the principles behind it, the
+project layout, a full CRUD file, form patterns, and orchestration. Copy it into your app as `AGENTS.md`.
