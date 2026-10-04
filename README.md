@@ -143,7 +143,7 @@ lookups, or anything that feeds a field before the outer form submits.
 Each table has a `readable` schema (what the database returns) and a `writable` schema (what a user may send).
 
 ```ts
-// app/todos/schema.ts
+// packages/todos/schema.ts
 import z from 'zod'
 
 export const readable = z.object({ id: z.string(), title: z.string(), done: z.boolean(), author: z.string() })
@@ -153,7 +153,7 @@ export const schema = { readable, writable }
 
 ```ts
 // app/schema.ts
-import { schema as todos } from './todos/schema'
+import { schema as todos } from '@/packages/todos/schema'
 export const schema = { todos }
 ```
 
@@ -195,7 +195,7 @@ export default function AppProviders({ children }: { children: React.ReactNode }
 // app/todos/layout.tsx: each route mounts the tables it uses
 'use client'
 import { TablesProvider } from 'asasvirtuais/context'
-import { schema } from './schema'
+import { schema } from '@/packages/todos/schema'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return <TablesProvider tables={{ todos: schema }}>{children}</TablesProvider>
@@ -259,20 +259,15 @@ For deletion, `useTable('todos', schema).remove.trigger({ id })` works on its ow
 ## Business rules in one place
 
 Every server action that writes to the database is another way into it, and another place where a check can be
-forgotten. With asasvirtuais the CRUD file is the only code that writes. Its handlers can look up a per-table set of
-rules, so who may create, update or remove what reads as a single list:
+forgotten. In asasvirtuais, writes go through the CRUD file, so whatever surrounds an operation is written once:
 
-```ts
-const allowed = {
-  todos: {
-    create: ({ user }) => !!user,
-    update: ({ user, current }) => current.author === user.id,
-    remove: ({ user, current }) => current.author === user.id,
-  },
-}
-```
+- **Pre-flight:** authentication, authorization, validation and default values, before the database call. This is
+  the app's middleware.
+- **Side effects:** emails, webhooks, and the records that must follow this one, after the database call.
 
-[`AGENTS.example.md`](./AGENTS.example.md#the-crud-file) shows a complete version with transactions and side effects.
+Next.js hides the message of an error a server action throws in production, so the CRUD actions (and any other server
+action) return `{ error: message }` instead, and the client throws it again for the forms to display.
+[`AGENTS.example.md`](./AGENTS.example.md#errors) has the small wrapper that does both.
 
 ---
 
@@ -281,7 +276,7 @@ const allowed = {
 Some features touch several tables. Two patterns cover them:
 
 - **Steps the user takes.** Each step is its own form, and one step's result (`onSuccess`, `onResult`, or
-  `await form.callback(...)`) opens the next. Each step is a normal operation, so its rule sits in the CRUD file
+  `await form.callback(...)`) opens the next. Each step is a normal operation, so its checks sit in the CRUD file
   with the rest.
 - **Things that must follow automatically.** An order that records a payment shouldn't depend on the client making a
   second request. The payment runs as a side effect in the order's `create` handler, inside the same transaction.
@@ -320,4 +315,4 @@ implements `find`, `list`, `create`, `update` and `remove` works.
 ## For coding agents
 
 [`AGENTS.example.md`](./AGENTS.example.md) explains how to build with asasvirtuais: the principles behind it, the
-project layout, a full CRUD file, form patterns, and orchestration. Copy it into your app as `AGENTS.md`.
+project and component-directory structure, the CRUD file and error handling, form patterns, orchestration, and coding rules. Copy it into your app as `AGENTS.md`.
