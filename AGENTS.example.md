@@ -282,6 +282,19 @@ halfway. Views of the other table refetch with `list.trigger(...)` in `onSuccess
 
 ---
 
+## Prototyping
+
+Demos and prototypes start on the framework, with `asasvirtuais-dexie` (IndexedDB) as the interface instead of
+`useState` or mock arrays:
+
+```tsx
+<InterfaceProvider {...dexieInterface(schema)}>{children}</InterfaceProvider>
+```
+
+Going to production means passing the CRUD file's actions instead. The UI stays the same.
+
+---
+
 # Rules
 
 1. **Read records from their provider.** Inside `{Model}Provider`, components use `use{Model}()`. They don't receive
@@ -296,23 +309,30 @@ halfway. Views of the other table refetch with `list.trigger(...)` in `onSuccess
 5. **Fail fast, return errors.** Throw `new Error('Unauthorized')` / `new Error('Forbidden')`, and call `notFound()`
    for missing records. Every server action is wrapped with `action(...)`, client components call `unwrap(actions)`,
    and server code calling another action uses `ok(await name(...))`.
-6. **Pages are declarative.** `page.tsx` stays a Server Component made of markup and focused components. Data comes from
-   `Filter{Model}s autoTrigger` or `list.trigger()`. Each layout mounts a `TablesProvider` with only the tables its
-   routes use. Shared providers and shells are hoisted to the closest common `layout.tsx`.
+6. **Pages are declarative.** `page.tsx` stays a Server Component made of markup and focused components. The client
+   components inside it fetch their own data with `Filter{Model}s autoTrigger` or `list.trigger()`. Each layout
+   mounts a `TablesProvider` with only the tables its routes use. Shared providers and shells are hoisted to the
+   closest common `layout.tsx`.
 7. **Component directories.** A page keeps its components in `components/` next to `page.tsx`, one lowercase directory
-   per component, with only the files it needs: `component.tsx` (`'use client'`), and when needed `actions.tsx`
-   (`'use server'`), `index.tsx` (server-side fetching), `context.tsx` or `hooks.tsx`. Code used only by a component
-   stays in its directory. A component shared by several pages lives with their closest common route.
+   per component, with only the files it needs:
+   - `component.tsx`: `'use client'`, the UI.
+   - `actions.tsx`: `'use server'`, the server actions it calls.
+   - `index.tsx`: a server component. It's usually the high-level version of the component, fetching on the server and
+     rendering `component.tsx`, and often goes inside `Suspense`. It is never a barrel file: import each file from its
+     own path.
+   - `cache.tsx`: cached server-side reads.
+   - `context.tsx`, `hooks.tsx`: shared context and local state, when needed.
+
+   Code used only by a component stays in its directory. A component shared by several pages lives with their closest
+   common route.
 8. **Packages are atomic.** `packages/{model}/` holds the schema, fields, forms, components, providers and hooks of
    one table. Page composition lives in `app/`.
 9. **`lib/` only for repeated code.** A library is a small single file that appears once the same code repeats across
-   several actions. Don't add layers of wrappers.
+   several actions.
 10. **Trust the schema.** Access guaranteed fields directly. Declare optional fields in the schema and give them
     standard UI defaults.
 11. **Plain names and text.** Contextual variable names. Simple UI text: "Create {Object}", "Update {Object}", "Delete
     {Object}", "Search", "Cancel".
-12. **Prototype on the framework.** Demos start with `asasvirtuais-dexie` as the interface instead of `useState` or mock
-    arrays. Going to production means replacing it with the CRUD file.
 
 ---
 
