@@ -54,7 +54,8 @@ In a larger app the database access is a package of its own. Here it's `app/db.t
    component actions they call.
 4. **Authorization.** With the UI settled and the features clear, each table gets its
    [middleware](#table-middleware).
-5. **Workflows** *(upcoming)*. Workflow validation and long-running workflows.
+5. **Workflows** *(upcoming)*. Beyond the app itself: a workflow is a series of machines operating across several
+   systems, and the app is one part of it.
 
 ---
 
@@ -334,7 +335,7 @@ export const remove = action(async (props: RemoveProps) => middleware(props.tabl
 Pre-flight is for authorization rules only. An LLM call is never a pre-flight step: it gets its own action, and its
 result goes through a form like any other data. Keeping business logic out of the CRUD keeps each one readable.
 
-The middleware comes late in the build. During prototyping these rules change with every iteration of
+The middleware is the last part of the app to be written. During prototyping these rules change with every iteration of
 the UI, so they wait until the UI is settled and the features are clear (stage 4 of
 [Building an app](#building-an-app)). Until then, `app/actions.ts` passes straight to `app/db.ts`.
 

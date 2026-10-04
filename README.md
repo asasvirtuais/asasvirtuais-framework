@@ -272,7 +272,8 @@ Some features touch several tables. Two patterns cover them:
 2. **UI layout and routing.** Routes, layouts and page skeletons.
 3. **Business logic.** The forms get assembled: `CreateForm`, `UpdateForm`, nested and multi-step `Form`s.
 4. **Authorization.** With the UI settled and the features clear, each table gets its middleware.
-5. **Workflows** *(upcoming)*. Workflow validation and long-running workflows.
+5. **Workflows** *(upcoming)*. Beyond the app itself: a workflow is a series of machines operating across several
+   systems, and the app is one part of it.
 
 ---
 
@@ -316,7 +317,7 @@ export const create = async (props: CreateProps) => middleware(props.table).crea
 Pre-flight is for authorization only. LLM calls and other business logic get actions of their own instead of being
 merged into the CRUD.
 
-The middleware comes late in the build (stage 4). While the app is being prototyped these rules change with every
+This is the last part of the app to be written. While the app is being prototyped these rules change with every
 iteration of the UI, so they wait until the UI is settled and the features are clear.
 
 ---
