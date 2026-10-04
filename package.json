@@ -10,7 +10,8 @@
   },
   "files": [
     "packages",
-    "tsconfig.json"
+    "tsconfig.json",
+    "AGENTS.example.md"
   ],
   "exports": {
     "./package.json": "./package.json",

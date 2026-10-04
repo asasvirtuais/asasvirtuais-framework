@@ -12,7 +12,7 @@ export function Form<Fields, Result>({children, ...params}: FormProps<Fields, Re
     return (
         <FieldsProvider<Fields> defaults={params.defaults}>
             {fields => (
-                <ActionProvider<Fields, Result> params={fields.fields} action={params.action} autoTrigger={params.autoTrigger} onError={params.onError}>
+                <ActionProvider<Fields, Result> params={fields.fields} action={params.action} autoTrigger={params.autoTrigger} onResult={params.onResult} onError={params.onError}>
                     {form => (
                         typeof children === 'function' ? children({...fields, ...form}) : children
                     )}
