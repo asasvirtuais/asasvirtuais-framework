@@ -190,25 +190,34 @@ export default function AppProviders({ children }: { children: React.ReactNode }
 ```
 
 ```tsx
-// app/todos/layout.tsx: each route mounts the tables it uses
-'use client'
-import { TablesProvider } from 'asasvirtuais/context'
+// app/todos/page.tsx: the page fetches its rows on the server and hands them to the table
+import { TableProvider } from 'asasvirtuais/registry'
+import { list } from '@/app/actions'
 import { schema } from '@/packages/todos/schema'
+import { Todos } from './todos'
 
-export default function Layout({ children }: { children: React.ReactNode }) {
-  return <TablesProvider tables={{ todos: schema }}>{children}</TablesProvider>
+export default async function TodosPage() {
+  const todos = await list({ table: 'todos', query: {} })
+  return (
+    <TableProvider table='todos' schema={schema} asAbove={Object.fromEntries(todos.map(t => [t.id, t]))}>
+      <Todos />
+    </TableProvider>
+  )
 }
 ```
 
 ### Forms and records
 
 ```tsx
+// app/todos/todos.tsx
 'use client'
-import { CreateForm, UpdateForm, FilterForm } from 'asasvirtuais/forms'
+import { CreateForm, UpdateForm } from 'asasvirtuais/forms'
+import { useTable } from 'asasvirtuais/context'
 import { SingleProvider, useSingle } from 'asasvirtuais/registry'
 import { schema } from '@/packages/todos/schema'
 
-export default function TodosPage() {
+export function Todos() {
+  const { array } = useTable('todos', schema)
   return (
     <>
       <CreateForm table='todos' schema={schema} defaults={{ title: '', done: false }}>
@@ -220,13 +229,11 @@ export default function TodosPage() {
         )}
       </CreateForm>
 
-      <FilterForm table='todos' schema={schema} autoTrigger>
-        {todos => todos.result?.map(t => (
-          <SingleProvider key={t.id} id={t.id} table='todos' schema={schema}>
-            <TodoItem />
-          </SingleProvider>
-        ))}
-      </FilterForm>
+      {array.map(t => (
+        <SingleProvider key={t.id} id={t.id} table='todos' schema={schema}>
+          <TodoItem />
+        </SingleProvider>
+      ))}
     </>
   )
 }
@@ -346,7 +353,7 @@ implements `find`, `list`, `create`, `update` and `remove` works.
 | `asasvirtuais/action` | `ActionProvider`, `useAction` |
 | `asasvirtuais/forms` | `CreateForm`, `UpdateForm`, `FilterForm`, `useCreateForm`, `useUpdateForm`, `useFilterForm` |
 | `asasvirtuais/context` | `InterfaceProvider`, `TablesProvider`, `useTable` |
-| `asasvirtuais/registry` | `SingleProvider`, `useSingle` |
+| `asasvirtuais/registry` | `TableProvider`, `SingleProvider`, `useSingle` |
 | `asasvirtuais/interface` | `makeSchemaTableInterface`, `TableInterface`, `Query`, `TableSchema` |
 
 ---
