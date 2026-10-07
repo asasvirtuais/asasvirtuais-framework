@@ -3,7 +3,23 @@ import { z } from 'zod'
 import React, { useState, useCallback, useEffect, createContext, useContext, useMemo } from 'react'
 
 import { TableSchema } from './interface'
-import { useTable } from './context'
+import { useTable, useTableProvider, TableProviderProps, TablesContext } from './context'
+
+export function TableProvider<TSchema extends TableSchema>({ children, ...props }: React.PropsWithChildren<TableProviderProps<TSchema>>) {
+
+    const context = useTableProvider(props)
+    const tables = useContext(TablesContext) ?? {}
+
+    const value = useMemo(() => {
+        return { ...tables, [props.table]: context }
+    }, [tables, props.table, context])
+
+    return (
+        <TablesContext.Provider value={value}>
+            {children}
+        </TablesContext.Provider>
+    )
+}
 
 export function useSingleProvider<TSchema extends TableSchema>({
     id, table, schema,

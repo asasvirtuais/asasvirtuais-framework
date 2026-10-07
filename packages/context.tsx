@@ -72,7 +72,7 @@ export function useTableProvider<TSchema extends TableSchema>({
     }
 }
 
-const TablesContext = createContext<Record<string, ReturnType<typeof useTableProvider<any>>> | undefined>(undefined)
+export const TablesContext = createContext<Record<string, ReturnType<typeof useTableProvider<any>>> | undefined>(undefined)
 
 export function TablesProvider({ children, tables }: { children: React.ReactNode, tables: Record<string, TableSchema> }) {
 
