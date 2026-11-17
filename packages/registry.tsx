@@ -56,6 +56,10 @@ export function useSingleProvider<TSchema extends TableSchema>({
     }
 }
 
+/**
+ * Every SingleProvider registers its record here by table, on top of the ones above it,
+ * so nested SingleProviders of different tables all stay readable with useSingle(schema, table).
+ */
 const SingleRegistry = createContext<Record<string, ReturnType<typeof useSingleProvider<any>>> | undefined>(undefined)
 
 export function SingleProvider<TSchema extends TableSchema>({
@@ -65,7 +69,6 @@ export function SingleProvider<TSchema extends TableSchema>({
     table: string
     schema: TSchema
     children: React.ReactNode | ((props: ReturnType<typeof useSingleProvider<TSchema>>) => React.ReactNode)
-    nullIfNotFound?: boolean
 }) {
     const value = useSingleProvider<TSchema>(props)
     const registry = useContext(SingleRegistry) ?? {}
@@ -74,7 +77,6 @@ export function SingleProvider<TSchema extends TableSchema>({
         return { ...registry, [props.table]: value }
     }, [registry, props.table, value])
 
-    if (props.nullIfNotFound && !value.single) return null
     return (
         <SingleRegistry.Provider value={newRegistry}>
             {typeof children === 'function' ? (

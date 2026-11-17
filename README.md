@@ -58,8 +58,8 @@ The permission check lives once, in the `todos` middleware. When the update reso
   follows. You don't need `useState` copies, `revalidatePath`, or refetching.
 - **Forms do the work.** `Form` pairs fields with an async action, and nests into multi-step flows. `CreateForm`,
   `UpdateForm` and `FilterForm` do the same against your tables.
-- **Business rules by table.** All database writes go through one CRUD interface, and each table's authorization
-  lives in its own middleware instead of being repeated in every action.
+- **Authorization by table.** CRUD goes through one interface, and each table's authorization lives in its own
+  middleware instead of being repeated in every action.
 - **One obvious way.** With fewer choices to make, an LLM writes the same structure every time and you review less.
 
 ---
@@ -104,35 +104,24 @@ You can use either one on its own.
 
 ### Nested and multi-step forms
 
-Naming the render prop after what the form represents (`order`, `zip`) lets nested forms share one closure. The inner
-form can run its own async step and write the result into the outer one:
+Naming the render prop after what the form represents lets nested forms share one closure. An inner form runs its own
+async action, and its `onResult` can write into the outer form's fields before the outer form submits:
 
 ```tsx
-<Form defaults={{ item: '', address: '' }} action={placeOrder} onResult={order => router.push(`/orders/${order.id}`)}>
-  {order => (
-    <form onSubmit={order.submit}>
-      <input value={order.fields.item} onChange={e => order.setField('item', e.target.value)} />
-
-      <Form defaults={{ zip: '' }} action={lookupZip} onResult={a => order.setField('address', `${a.street}, ${a.city}`)}>
-        {zip => (
-          <div>
-            <input value={zip.fields.zip} onChange={e => zip.setField('zip', e.target.value)} />
-            <button type='button' onClick={zip.submit} disabled={zip.loading}>
-              {zip.loading ? 'Looking up…' : 'Fill address'}
-            </button>
-          </div>
-        )}
+<Form defaults={outerDefaults} action={outerAction}>
+  {outer => (
+    <form onSubmit={outer.submit}>
+      <Form defaults={innerDefaults} action={innerAction} onResult={result => outer.setField('field', result)}>
+        {inner => <button type='button' onClick={inner.submit} disabled={inner.loading}>…</button>}
       </Form>
-
-      {order.fields.address && <p>Shipping to {order.fields.address}</p>}
-      <button type='submit' disabled={order.loading}>Place order</button>
+      <button type='submit' disabled={outer.loading}>…</button>
     </form>
   )}
 </Form>
 ```
 
-`order.loading` and `zip.loading` are independent. You can add steps the same way: validation, AI drafts, address
-lookups, or anything that feeds a field before the outer form submits.
+`outer.loading` and `inner.loading` are independent. Multi-step forms and most workflows are built this way: each step
+is a form, and its result opens the next.
 
 ---
 
@@ -254,6 +243,13 @@ function TodoItem() {
 ```
 
 `SingleProvider` fetches the record if it isn't in the index yet, and any descendant can read it with `useSingle`.
+It always renders its children; to render nothing until the record exists, use its render prop:
+`{({ single }) => single ? <TodoItem /> : null}`.
+
+There are two `SingleProvider`s. The one in `asasvirtuais/registry` (the default) keeps every record by table, so
+nested providers of different tables all stay readable with `useSingle(schema, table)`. The one in
+`asasvirtuais/single` is a plain React context: `useSingle(schema)` needs no table, but a nested provider replaces the
+one above it, so records of two tables can't be combined.
 For deletion, `useTable('todos', schema).remove.trigger({ id })` works on its own or wrapped in an `ActionProvider`.
 
 `list` queries are FeathersJS-style: field matches, `$ne $lt $lte $gt $gte $in $nin $or $and`, and
@@ -261,55 +257,70 @@ For deletion, `useTable('todos', schema).remove.trigger({ id })` works on its ow
 
 ---
 
-## Orchestrating operations
+## Server code
 
-Some features touch several tables. Two patterns cover them:
+The server runs three kinds of code, and they don't mix:
 
-- **Steps the user takes.** Each step is its own form, and one step's result (`onSuccess`, `onResult`, or
-  `await form.callback(...)`) opens the next. Each step is a normal operation, so its rules sit in its table's
-  middleware.
-- **Things that must follow automatically.** An order that records a payment shouldn't depend on the client making a
-  second request. The payment runs as a side effect in the `orders` middleware's `create`, inside the same transaction.
+- **CRUD operations.** `find`, `list`, `create`, `update` and `remove`, each on **one** table. They go through the
+  table's middleware, which holds its authorization and nothing else.
+- **Custom server actions.** Any other computation: an external API, an LLM, a file, a calculation. Each does one
+  thing, lives next to the component that calls it, calls the database directly and carries its own authorization.
+  When its result should be saved, a form saves it through the CRUD.
+- **Complex operations.** The rare request that must write several tables together. It's a custom server action of
+  its own with a transaction, never logic tucked into a table's middleware.
+
+Most features that touch several tables are none of the above: they're steps. Each step is a form, and one step's
+result (`onSuccess`, `onResult`, or `await form.callback(...)`) opens the next. And a value that follows from other
+rows (whether related rows exist, how many) isn't stored at all: it's read from the relations.
+
+---
+
+## Workflows
+
+Most workflows run in the client: the user follows the process on screen, each state shows the action that moves it
+forward, and a failed action just doesn't advance. They're nested, multi-step forms with some hand-written state. The
+Vercel Workflow SDK is for workflows that run on the server without the user: long jobs, retries, waiting on external
+events.
 
 ---
 
 ## How an app gets built
 
-1. **Data modeling, by feature.** Each feature's tables become packages: `packages/{model}/schema.ts`.
-2. **UI layout and routing.** Routes, layouts and page skeletons.
-3. **Business logic.** The forms get assembled: `CreateForm`, `UpdateForm`, nested and multi-step `Form`s.
-4. **Authorization.** With the UI settled and the features clear, each table gets its middleware.
-5. **Workflows** *(upcoming)*. Beyond the app itself: a workflow is a series of machines operating across several
-   systems, and the app is one part of it.
+1. **Data modeling.** Each feature's tables become packages: `packages/{model}/schema.ts`.
+2. **Layout and routing.** Routes, layouts and page skeletons.
+3. **Pages and forms.** Forms, pagination, filters, and the custom server actions the pages need.
+4. **Workflows.** Client workflows with nested forms, backend workflows with the Vercel Workflow SDK.
+5. **Middleware and authorization.** With the features settled, each table gets its middleware and each custom server
+   action its authorization.
+
+The rules come last on purpose: written early, they'd have to be rewritten every time the UI changes. A team working
+by hand runs the same order as a four-week sprint (planning and setup, stages 1–2, stage 3, stages 4–5).
 
 ---
 
 ## Table middleware
 
-Nobody reads every table's business rules together. You read them by domain. So each model gets a `middleware.ts`
-that wraps the raw database interface for its table, by passing the table to `makeSchemaTableInterface`:
+Nobody reads every table's authorization rules together. You read them by domain. So each model gets a `middleware.ts`
+that wraps the raw database interface, typed by the table's schema with `asasvirtuaisInterface`:
 
 ```ts
 // packages/todos/middleware.ts
-export const todos = makeSchemaTableInterface({ todos: schema }, 'todos', {
-  find: (props) => db.find(props),
-  list: (props) => db.list(props),
-  create: async (props) => {
-    // pre-flight: authorization
-    const result = await db.create(props)
-    // side effects
-    return result
-  },
-  update: async (props) => { /* pre-flight */ const result = await db.update(props); /* side effects */ return result },
-  remove: async (props) => { /* pre-flight */ const result = await db.remove(props); /* side effects */ return result },
-})!
+import { asasvirtuaisInterface } from 'asasvirtuais/interface'
+
+export const todos = asasvirtuaisInterface(schema, {
+  find: async (props) => { /* authorization */ return db.find(props) },
+  list: async (props) => { /* authorization */ return db.list(props) },
+  create: async (props) => { /* authorization */ return db.create(props) },
+  update: async (props) => { /* authorization */ return db.update(props) },
+  remove: async (props) => { /* authorization */ return db.remove(props) },
+})
 ```
 
 The CRUD file then switches on the table and calls its middleware:
 
 ```ts
 // app/actions.ts
-function middleware(table?: string) {
+function middleware(table?: string): TableInterface<any, any> {
   switch (table) {
     case 'todos': return todos
     case 'tags': return tags
@@ -321,8 +332,10 @@ export const create = async (props: CreateProps) => middleware(props.table).crea
 // find, list, update and remove the same way
 ```
 
-Pre-flight is for authorization only. LLM calls and other business logic get actions of their own instead of being
-merged into the CRUD.
+The middleware holds authorization only. It doesn't write to other tables or run business logic: that's what custom
+server actions are for.
+
+`asasvirtuaisInterface` also takes the whole database schema (`{ todos, tags }`), typing an interface over every table.
 
 This is the last part of the app to be written. While the app is being prototyped these rules change with every
 iteration of the UI, so they wait until the UI is settled and the features are clear.
@@ -353,12 +366,14 @@ implements `find`, `list`, `create`, `update` and `remove` works.
 | `asasvirtuais/action` | `ActionProvider`, `useAction` |
 | `asasvirtuais/forms` | `CreateForm`, `UpdateForm`, `FilterForm`, `useCreateForm`, `useUpdateForm`, `useFilterForm` |
 | `asasvirtuais/context` | `InterfaceProvider`, `TablesProvider`, `useTable` |
-| `asasvirtuais/registry` | `TableProvider`, `SingleProvider`, `useSingle` |
-| `asasvirtuais/interface` | `makeSchemaTableInterface`, `TableInterface`, `Query`, `TableSchema` |
+| `asasvirtuais/registry` | `TableProvider`, `SingleProvider`, `useSingle(schema, table)` |
+| `asasvirtuais/single` | `SingleProvider`, `useSingle(schema)` |
+| `asasvirtuais/interface` | `asasvirtuaisInterface`, `TableInterface`, `Query`, `TableSchema`, `DatabaseSchema` |
 
 ---
 
 ## For coding agents
 
 [`AGENTS.example.md`](./AGENTS.example.md) explains how to build with asasvirtuais: the principles behind it, the
-project and component-directory structure, the build stages, the CRUD file, table middleware and error handling, form patterns, orchestration, and coding rules. Copy it into your app as `AGENTS.md`.
+project and component-directory structure, the build stages, the CRUD file, custom server actions and complex operations, workflows, table middleware and
+error handling, and coding rules. Copy it into your app as `AGENTS.md`.

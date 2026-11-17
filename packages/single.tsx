@@ -43,6 +43,11 @@ export function useSingleProvider<TSchema extends TableSchema>({
     }
 }
 
+/**
+ * A plain React context: useSingle(schema) needs no table, and the record isn't kept in a registry.
+ * A nested SingleProvider replaces the one above it, so only the closest record is readable.
+ * To combine records of several tables, use SingleProvider from 'asasvirtuais/registry'.
+ */
 const Context = createContext<ReturnType<typeof useSingleProvider<any>> | undefined>(undefined)
 
 export function SingleProvider<TSchema extends TableSchema>({
