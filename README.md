@@ -259,42 +259,45 @@ For deletion, `useTable('todos', schema).remove.trigger({ id })` works on its ow
 
 ## Server code
 
-The server runs three kinds of code, and they don't mix:
+What is CRUD goes through the CRUD interface. What is not CRUD is a server action.
 
 - **CRUD operations.** `find`, `list`, `create`, `update` and `remove`, each on **one** table. They go through the
-  table's middleware, which holds its authorization and nothing else.
-- **Custom server actions.** Any other computation: an external API, an LLM, a file, a calculation. Each does one
-  thing, lives next to the component that calls it, calls the database directly and carries its own authorization.
-  When its result should be saved, a form saves it through the CRUD.
-- **Complex operations.** The rare request that must write several tables together. It's a custom server action of
-  its own with a transaction, never logic tucked into a table's middleware.
+  table's middleware, which centralizes the authorization of that table's operations.
+- **Server actions.** Execution of external APIs and calls, LLM calls, any other computational operation. Each does
+  one thing, lives next to the component that calls it, calls the database without the middleware and receives its
+  own authorization logic. When its result should be saved, a form saves it through the CRUD.
+- **Complex operations.** When there's a clearly defined need to mutate two tables in one operation, a server action
+  specific for it. Never logic inside the CRUD middleware.
 
-Most features that touch several tables are none of the above: they're steps. Each step is a form, and one step's
-result (`onSuccess`, `onResult`, or `await form.callback(...)`) opens the next. And a value that follows from other
-rows (whether related rows exist, how many) isn't stored at all: it's read from the relations.
+A request that creates a row answers with the row created, and most of the time the client starts what comes next
+after that response. A status that only notes a table's relation with another (whether there are related rows) isn't
+written anywhere: the relational database already holds it, and the front-end shows it.
 
 ---
 
-## Workflows
+## Workflows and custom features
 
-Most workflows run in the client: the user follows the process on screen, each state shows the action that moves it
-forward, and a failed action just doesn't advance. They're nested, multi-step forms with some hand-written state. The
-Vercel Workflow SDK is for workflows that run on the server without the user: long jobs, retries, waiting on external
-events.
+A simple workflow has a state, the state shows the screen, and the screen always has the same button in that state. If
+there's an error, it just doesn't advance, and the user clicks again. The user is constantly present, so simple
+workflows, such as multi-step asynchronous forms, are nested forms. Workflows that run in the back-end use the Vercel
+Workflow SDK.
+
+A custom feature is something written by hand: a custom state management or a state machine, like a piece of a game or
+following an active workflow while it executes, with polling.
 
 ---
 
 ## How an app gets built
 
-1. **Data modeling.** Each feature's tables become packages: `packages/{model}/schema.ts`.
-2. **Layout and routing.** Routes, layouts and page skeletons.
-3. **Pages and forms.** Forms, pagination, filters, and the custom server actions the pages need.
-4. **Workflows.** Client workflows with nested forms, backend workflows with the Vercel Workflow SDK.
-5. **Middleware and authorization.** With the features settled, each table gets its middleware and each custom server
-   action its authorization.
+1. **Data modeling.** Each feature's tables become packages: `packages/{model}/schema.ts`, the schemas in Zod.
+2. **Layout.** Routes, layouts and page skeletons.
+3. **Pages, forms and server actions.** Forms, pagination, and the server actions the pages need.
+4. **Middleware and authorization.** Middleware rules, authentication, authorization, once the features are defined.
+5. **Workflows and custom features.** What needs a hand-written state management or a state machine.
 
-The rules come last on purpose: written early, they'd have to be rewritten every time the UI changes. A team working
-by hand runs the same order as a four-week sprint (planning and setup, stages 1–2, stage 3, stages 4–5).
+Everything is thought with fast prototyping in mind: rules coded at the start have to change every time something
+simple changes in the front-end. A team working by hand runs the same order as a four-week sprint (planning and setup,
+stages 1–2, stage 3, stages 4–5).
 
 ---
 
@@ -332,13 +335,13 @@ export const create = async (props: CreateProps) => middleware(props.table).crea
 // find, list, update and remove the same way
 ```
 
-The middleware holds authorization only. It doesn't write to other tables or run business logic: that's what custom
-server actions are for.
+The middleware holds authorization only. It doesn't mutate other tables or execute effects in the back-end: what
+isn't CRUD is a server action.
 
 `asasvirtuaisInterface` also takes the whole database schema (`{ todos, tags }`), typing an interface over every table.
 
-This is the last part of the app to be written. While the app is being prototyped these rules change with every
-iteration of the UI, so they wait until the UI is settled and the features are clear.
+The middleware is written in stage 4, once the features of the app are defined. While the app is being prototyped
+these rules would change with every iteration of the UI.
 
 ---
 
@@ -375,5 +378,5 @@ implements `find`, `list`, `create`, `update` and `remove` works.
 ## For coding agents
 
 [`AGENTS.example.md`](./AGENTS.example.md) explains how to build with asasvirtuais: the principles behind it, the
-project and component-directory structure, the build stages, the CRUD file, custom server actions and complex operations, workflows, table middleware and
+project and component-directory structure, the build stages, the CRUD file, server actions and complex operations, workflows and custom features, table middleware and
 error handling, and coding rules. Copy it into your app as `AGENTS.md`.

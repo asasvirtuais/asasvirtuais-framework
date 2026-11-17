@@ -46,7 +46,7 @@ packages/
     ├── components.tsx    # {Model}Item, Single{Model}
     ├── providers.tsx     # {Model}sProvider (the table), {Model}Provider (one row)
     ├── hooks.tsx         # use{Model}s(), use{Model}()
-    └── middleware.ts     # the table's authorization, written last
+    └── middleware.ts     # the table's authorization, written in stage 4
 lib/                      # small shared files, only once code repeats
 ```
 
@@ -54,27 +54,26 @@ In a larger app the database access is a package of its own. Here it's `app/db.t
 
 ## Building an app
 
-An app is built in five stages, in this order. Each stage builds on what the one before it settled, and the rules come
-last: rules written while the features are still changing have to be rewritten every time the UI changes. The order is
-what makes fast prototyping possible.
+An app is built in five stages, in this order. Everything is thought with fast prototyping in mind: if the rules are
+coded at the start, every time something simple changes in the front-end, in the way the app works, the code of the
+rules written for the previous model has to change too.
 
-1. **Data modeling.** Each feature's tables become packages, starting with `packages/{model}/schema.ts`: the Zod
-   schemas of what gets stored. Whatever can be read from the relations between rows is not a column
+1. **Data modeling.** Each feature's tables become packages, starting with `packages/{model}/schema.ts`: the schemas
+   in Zod. What the relational database already answers is not a column
    ([derived state](#derived-state-is-read-not-written)).
-2. **Layout and routing.** Routes, layouts, navigation and page skeletons, each page providing the tables it shows
-   with the rows it fetched.
-3. **Pages and forms.** Each page gets its forms (`CreateForm`, `UpdateForm`, `FilterForm`), its pagination and
-   filters, and the [custom server actions](#custom-server-actions) its components call. When this stage ends, the
-   features of the app are defined.
-4. **Workflows.** Processes of several steps: [client workflows](#client-workflows) with nested forms and hand-written
-   state, and [backend workflows](#backend-workflows) with the Vercel Workflow SDK.
-5. **Middleware and authorization.** Authentication, each table's [middleware](#table-middleware), and the
-   authorization of each custom server action. This is the advanced part of the app, and it waits until the features
-   are settled.
+2. **Layout.** Routes, layouts and page skeletons, each page providing the tables it shows with the rows it fetched.
+3. **Pages, forms and server actions.** Each page gets its forms (`CreateForm`, `UpdateForm`, `FilterForm`), its
+   pagination, and the [server actions](#server-actions) it needs, [complex operations](#complex-operations)
+   included.
+4. **Middleware and authorization.** Middleware rules, authentication, authorization: the advanced part of the app.
+   It comes once the features of the app are defined, and gives each table its [middleware](#table-middleware) and
+   each server action its own authorization.
+5. **Workflows and custom features.** [Workflows](#workflows) and [custom features](#custom-features): what needs a
+   hand-written state management or a state machine.
 
 A team working by hand runs the same order as a four-week sprint, presenting at the end of each week: planning and
-project setup, then stages 1 and 2, then stage 3, then stages 4 and 5. An agent goes through the stages much faster, but
-in the same order.
+project setup, then stages 1 and 2, then stage 3, then stages 4 and 5. An agent develops much faster and doesn't need
+the planning, but it has to do things in this order.
 
 ---
 
@@ -112,7 +111,7 @@ before the outer form submits:
 </Form>
 ```
 
-This is how multi-step forms and [client workflows](#client-workflows) are built. An inner step exists only when the
+This is how multi-step forms and [simple workflows](#simple-workflows) are built. An inner step exists only when the
 user asked for that step.
 
 ---
@@ -328,13 +327,13 @@ search or the next page of results. `FilterForm` keeps its `result` local.
 
 ## Server code
 
-The server runs three kinds of code. Each has one place, and they don't mix.
+What is CRUD goes through the CRUD interface. What is not CRUD is a server action.
 
 | Kind | What it does | Where it lives | Its authorization |
 |---|---|---|---|
 | CRUD operation | `find`, `list`, `create`, `update` or `remove` on **one** table | `app/actions.ts` → the table's middleware → `app/db.ts` | the table's `middleware.ts` |
-| Custom server action | any other computation: an external API, an LLM, a file, a calculation, a read the CRUD can't express | `actions.tsx` of the component that calls it | inside the action |
-| Complex operation | a mutation of several tables that must happen together | a custom server action of its own, in a transaction | inside the action |
+| Server action | everything that isn't CRUD: an external API call, an LLM call, any computation | `actions.tsx` of the component that calls it | inside the action |
+| Complex operation | a mutation of two or more tables in one operation | a server action of its own | inside the action |
 
 ### A CRUD operation is one table
 
@@ -342,66 +341,62 @@ A CRUD operation reads or writes the table it was called for, and nothing else. 
 the caller may run it, and that is all it does: it doesn't write to other tables, call external APIs, or run business
 logic. A `create` answers with the row it created. That answer is what the client acts on next.
 
-### Custom server actions
+### Server actions
 
-A custom server action is any server computation that isn't a CRUD operation: calling an external API or an LLM,
-processing a file, a calculation, a server-side read the CRUD can't express. Each action does one thing and lives in the
-`actions.tsx` of the component that calls it, wrapped with `action(...)`.
+Server actions are for executing external APIs and calls, LLM calls, and any other computational operation. Each one
+does one thing and lives in the `actions.tsx` of the component that calls it, wrapped with `action(...)`.
 
-Custom server actions are the exception to the CRUD rule. They call `app/db.ts` directly, without going through any
-middleware, because the middleware is for CRUD operations. So each one carries its own authorization check (written in
-stage 5, like the middleware). Where the same check or helper repeats across actions, it moves into a small function in
-`lib/`.
+Server actions are the exception to the rule. They call `app/db.ts` without going through the middleware, because the
+middleware is for CRUD operations. So each one receives its own authorization logic (in stage 4, with the middleware).
+Even when that repeats logic, what is a repeated function goes into a file in the project's `lib/`.
 
 When an action's result should be saved, the action returns it, and a form saves it through the CRUD.
 
 ### Complex operations
 
-A complex operation is the one case where a single request writes to several tables: the writes must happen together,
-and one must never exist without the others. That need has to be clear, not assumed. A complex operation is written as
-its own custom server action, running the writes in one transaction. It is never placed in the CRUD or in a table's
-middleware. The client puts the rows it returns into each table's index (`set` in `onResult`), or calls
-`router.refresh()`.
+When there is a clearly defined need to mutate two tables in one operation, write a server action specific for it. Never
+put that logic into the CRUD middleware, which is defined for the operations of one table. Often a double operation is
+just a server action, not that complex.
 
 These are not complex operations:
 
 - **Steps the user takes.** Each is its own form, and the result of one (`onSuccess`, `onResult`,
   `await form.callback(...)`) opens the next.
-- **Something that can follow a write.** The client receives the created row, then starts what comes next.
-- **Keeping a summary up to date.** See below.
+- **Something that follows a write.** A request that creates a row answers with the row created. Most of the time the
+  client starts what comes next after it has that response.
+- **Keeping a status of a relation up to date.** See below.
 
 ### Derived state is read, not written
 
-A value that follows from other rows (whether related rows exist, how many there are, which one is the latest, a status
-that only reflects them) is not a column, and no write keeps it up to date. The relational database already holds the
-answer: read the related rows (the ones the page fetched, or a `list` with a query) and render from them. A column
-stores only what a user or a process decides.
+A status that only notes the state of a table's relation with another table (whether there are related rows, whether
+there still are) is not a column, and no update writes it. The relational database already holds it: read the related
+rows, and in the front-end show what they say.
 
 ---
 
 ## Workflows
 
-A workflow is a process of several steps. Most of them run in the client.
+### Simple workflows
 
-### Client workflows
+A simple workflow has a state, the state shows the screen, and the screen has a button that is always there in that
+state. If there's an error, it just doesn't advance to the next state, and the user clicks again. If it stops or fails
+at any moment, the user restarts it by reloading the page and clicking the button they had clicked before. It doesn't
+execute several things in the back-end, and the user is constantly present.
 
-The user is present through the whole process. The current state decides what the screen shows, and each state has the
-action that moves it forward. If the action fails, the state doesn't advance, and the user runs it again. Reloading the
-page shows the same state with the same action. Nothing has to be resumed on the server.
-
-Client workflows are built with nested and multi-step [forms](#form): each step is a `Form`, and its result opens the
-next step. State the steps share is hand-written in the page's `context.tsx` / `hooks.tsx`. State that must survive a
-reload is a field of the record the workflow is about, saved with an `UpdateForm`.
-
-Most business processes are client workflows, with someone following the process on screen. Having a workflow is not a
-reason to use a workflow engine.
+Simple workflows, such as multi-step asynchronous forms, are built with nested [forms](#form). Having a workflow is not
+a reason to use the Vercel Workflow SDK: in most business cases an employee is constantly there following the process.
 
 ### Backend workflows
 
-When the steps run on the server without the user (long jobs, retries, waiting on external events, several server
-steps that must all complete), the workflow uses the Vercel Workflow SDK. A custom server action starts it. When it has
-to follow a CRUD write whatever the client does, the table's middleware may start it after the write. Starting a backend
-workflow is the only thing a middleware does after the write.
+Workflows that run in the back-end use the Vercel Workflow SDK. They are usually programming problems that need it. A
+server action starts them. A side effect of a CRUD write can start one too, but most of the time that isn't necessary:
+the client starts the workflow after it has the response.
+
+## Custom features
+
+A custom feature is something that has to be written by hand: a custom state management or a state machine. It can be
+a piece of a game, or following an active workflow while it executes, with polling. Its state lives in the page's
+`context.tsx` / `hooks.tsx`.
 
 ---
 
@@ -469,7 +464,7 @@ export const remove = action(async (props: RemoveProps) => middleware(props.tabl
 `asasvirtuaisInterface` takes one table's schema (`{ readable, writable }`) for a middleware, or the whole database
 schema (`{ projects, todos }`) for an interface over every table, such as an adapter.
 
-The middleware is written in stage 5 of [Building an app](#building-an-app). Until then, `app/actions.ts` passes
+The middleware is written in stage 4 of [Building an app](#building-an-app). Until then, `app/actions.ts` passes
 straight to `app/db.ts`.
 
 ---
@@ -494,21 +489,22 @@ Going to production means passing the CRUD file's actions instead. The UI stays 
 2. **Read records from their provider.** Inside `{Model}Provider`, components use `use{Model}()`. They don't receive
    the record, or its fields, as props.
 3. **Use the framework forms for database operations**, including single-column updates. A flag, a status or a name is
-   an `UpdateForm` with one field, not a custom server action. The reactive index updates the UI, so there's no need
+   an `UpdateForm` with one field, not a server action. The reactive index updates the UI, so there's no need
    for `useState` copies of rows, manual `set` calls, or revalidation.
-4. **A CRUD operation is one table.** CRUD goes through `app/actions.ts` and the table's middleware, and the middleware
-   holds that table's authorization only. A CRUD operation or a middleware never writes to another table, never calls
-   an external API, and never runs business logic.
-5. **Custom server actions do one thing.** External APIs, LLM calls and any other computation live in the
-   `actions.tsx` of the component that uses them, one call per action. They call `app/db.ts` directly and carry their
-   own authorization; repeated checks go into `lib/`. When their result should be saved, it goes into a form.
-6. **Complex operations only when clearly needed.** Several tables are written in one request only when the writes
-   must happen together, in a custom server action with a transaction. Steps the user takes are separate forms, and
-   what can follow a write starts in the client after the response.
-7. **Don't store what the relations already say.** No column, and no extra write, for whether related rows exist,
-   how many there are, or a status that only reflects them. Read the related rows and render from them.
-8. **Client workflows are forms.** A process the user follows on screen is nested and multi-step `Form`s with
-   hand-written state. The Vercel Workflow SDK is for steps that run on the server without the user.
+4. **A CRUD operation is one table.** CRUD goes through `app/actions.ts` and the table's middleware, which centralizes
+   the authorization of that table's operations. Never put the mutation of other tables or the execution of effects in
+   the back-end into a CRUD operation or its middleware.
+5. **What isn't CRUD is a server action.** External APIs and calls, LLM calls and any other computation live in the
+   `actions.tsx` of the component that uses them, one call per action. They call `app/db.ts` without the middleware
+   and receive their own authorization logic; repeated functions go into `lib/`. When their result should be saved,
+   it goes into a form.
+6. **Complex operations only when clearly defined.** Two tables are mutated in one operation only when the need is
+   clear, in a server action written for it. Steps the user takes are separate forms, and what follows a write starts
+   in the client after the response.
+7. **Don't write a status the relations already hold.** No column, and no update, for whether a table has related
+   rows in another. Read the relation and show it in the front-end.
+8. **Simple workflows are nested forms.** A workflow the user follows on screen is nested `Form`s. The Vercel Workflow
+   SDK is for workflows that run in the back-end.
 9. **Fail fast, return errors.** Throw `new Error('Unauthorized')` / `new Error('Forbidden')`, and call `notFound()`
    for missing records. Every server action is wrapped with `action(...)`, client components call `unwrap(actions)`,
    and server code calling another action uses `ok(await name(...))`.
@@ -529,7 +525,7 @@ Going to production means passing the CRUD file's actions instead. The UI stays 
 11. **Component directories.** A page keeps its components in `components/` next to `page.tsx`, one lowercase
     directory per component, with only the files it needs:
     - `component.tsx`: `'use client'`, the UI.
-    - `actions.tsx`: `'use server'`, the custom server actions it calls.
+    - `actions.tsx`: `'use server'`, the server actions it calls.
     - `index.tsx`: a server component. It's usually the high-level version of the component, fetching on the server
       and rendering `component.tsx`, and often goes inside `Suspense`. It is never a barrel file: import each file
       from its own path.
