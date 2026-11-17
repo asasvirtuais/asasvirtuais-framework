@@ -376,6 +376,20 @@ implements `find`, `list`, `create`, `update` and `remove` works.
 
 ---
 
+## Recommended project files
+
+Building with a coding agent works best when the project keeps its context in a few Markdown files:
+
+- `brief.md`: what the client asked for.
+- `specs.md`: how it's built, technically. Kept up to date as development goes and things change.
+- `plan.md`: the initial plan for the project.
+- `changelog.md`: what has been developed so far.
+- `roadmap.md`: ideas for the future of the project.
+- `README.md`: written at the end from the plan, the changelog and the commits: what was done, how, and how to start
+  using it.
+
+---
+
 ## For coding agents
 
 [`AGENTS.example.md`](./AGENTS.example.md) explains how to build with asasvirtuais: the principles behind it, the

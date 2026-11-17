@@ -476,19 +476,6 @@ straight to `app/db.ts`.
 
 ---
 
-## Prototyping
-
-Demos and prototypes start on the framework, with `asasvirtuais-dexie` (IndexedDB) as the interface instead of
-`useState` or mock arrays:
-
-```tsx
-<InterfaceProvider {...dexieInterface(schema)}>{children}</InterfaceProvider>
-```
-
-Going to production means passing the CRUD file's actions instead. The UI stays the same.
-
----
-
 # Rules
 
 1. **Build only what was asked.** The examples in this file are placeholders for the API. Features, steps, buttons
