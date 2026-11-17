@@ -386,6 +386,13 @@ execute several things in the back-end, and the user is constantly present.
 Simple workflows, such as multi-step asynchronous forms, are built with nested [forms](#form). Having a workflow is not
 a reason to use the Vercel Workflow SDK: in most business cases an employee is constantly there following the process.
 
+### The workflow's record
+
+A workflow is usually accompanied by a record in the database, and the state of the workflow is in that record, in its
+table. When a result must not be lost if the user closes the page, the workflow creates its record first with status
+`pending`, and the record gets status `error` when something goes wrong. The interface shows that it went wrong, with a
+retry button. That is the MVP solution: no automatic retries.
+
 ### Backend workflows
 
 Workflows that run in the back-end use the Vercel Workflow SDK. They are usually programming problems that need it. A

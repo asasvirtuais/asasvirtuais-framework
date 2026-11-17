@@ -279,7 +279,8 @@ written anywhere: the relational database already holds it, and the front-end sh
 
 A simple workflow has a state, the state shows the screen, and the screen always has the same button in that state. If
 there's an error, it just doesn't advance, and the user clicks again. The user is constantly present, so simple
-workflows, such as multi-step asynchronous forms, are nested forms. Workflows that run in the back-end use the Vercel
+workflows, such as multi-step asynchronous forms, are nested forms. A workflow's state is kept in the record it's about
+(`pending`, `error`), and an error shows in the interface with a retry button. Workflows that run in the back-end use the Vercel
 Workflow SDK.
 
 A custom feature is something written by hand: a custom state management or a state machine, like a piece of a game or
