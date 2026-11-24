@@ -1,0 +1,69 @@
+Asas Virtuais Attribution License (AVAL), version 1.0
+
+Copyright (c) Ícaro Carniello Capobianco / Asas Virtuais
+https://asasvirtuais.com
+
+All rights are reserved, except for the rights this license grants below.
+
+"The Software" means the asasvirtuais framework, its packages and adapters
+(including asasvirtuais-dexie and asasvirtuais-prisma), its documentation and
+its agent guides (such as AGENTS.example.md).
+
+1. GRANT
+
+You may use, copy and include the Software in your own applications, websites
+and products, including commercial ones, free of charge, as long as you follow
+every condition below.
+
+2. ATTRIBUTION
+
+Every application, website or product that uses the Software must show the
+notice "Built with asasvirtuais", linked to https://asasvirtuais.com, in a
+place where its users can reasonably find it, such as the footer, an "about"
+page or a credits screen.
+
+Every copy of the Software's source, and every source repository that
+includes it, must keep this license and the copyright notice above.
+
+3. MODIFICATIONS
+
+You may change the Software for use inside your own application.
+
+You may not publish or distribute the Software, changed or unchanged, on its
+own or under another name. This includes forks, rebranded frameworks, starter
+kits, templates, courses, and AI agent guides built on it.
+
+4. NO COMPETING OFFERINGS
+
+You may not sell, rent or host the Software, or offer it as a service, where
+the Software is the main thing being offered.
+
+5. USES THAT NEED PERMISSION
+
+You may not use the Software, under this license, in:
+
+  a) gambling, betting or casino products;
+  b) scams, pyramid or get-rich-quick schemes, or any product built to
+     deceive or defraud its users;
+  c) anything illegal where it is built or where it is used.
+
+If you want to build something like this, ask first. Asas Virtuais may say yes
+or no.
+
+6. COMMERCIAL LICENSE
+
+To use the Software without the attribution in section 2, or in any way these
+terms don't allow, you need a separate written license from Asas Virtuais.
+Contact us through https://www.linkedin.com/company/asasvirtuaisdev or
+icaro@asasvirtuais.dev.
+
+7. TERMINATION
+
+If you break these terms, your rights under this license end automatically.
+They return if you fix the breach within 30 days of being notified of it.
+
+8. NO WARRANTY
+
+The Software is provided "as is", without warranty of any kind. The authors
+are not liable for any claim, damages or other liability arising from the
+Software or its use.

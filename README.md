@@ -8,6 +8,12 @@ lists refresh after a save, where the permission check goes. An LLM answers them
 boilerplate that comes with each answer. asasvirtuais answers them once. A feature becomes a form on top of a table,
 and code gets written several times faster.
 
+> **Free to use, with credit.** asasvirtuais is free for personal, learning and commercial projects. The one rule:
+> every app built with it shows **"Built with asasvirtuais"** linked to [asasvirtuais.com](https://asasvirtuais.com).
+> Forks, rebrands, starter kits and resold copies are not allowed, and gambling, betting and scam products need written
+> permission first. Want to skip the credit or do something the license doesn't cover? Ask:
+> [Asas Virtuais on LinkedIn](https://www.linkedin.com/company/asasvirtuaisdev). Full terms in [LICENSE](./LICENSE).
+
 ---
 
 ## What it looks like
@@ -395,3 +401,11 @@ Building with a coding agent works best when the project keeps its context in a 
 [`AGENTS.example.md`](./AGENTS.example.md) explains how to build with asasvirtuais: the principles behind it, the
 project and component-directory structure, the build stages, the CRUD file, server actions and complex operations, workflows and custom features, table middleware and
 error handling, and coding rules. Copy it into your app as `AGENTS.md`.
+
+---
+
+## License
+
+[Asas Virtuais Attribution License 1.0](./LICENSE). Use it freely, keep the "Built with asasvirtuais" credit, don't
+fork or resell it, and ask before using it for gambling, betting or scams. Everything else:
+[talk to us](https://www.linkedin.com/company/asasvirtuaisdev).
