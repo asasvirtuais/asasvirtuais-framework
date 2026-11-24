@@ -11,7 +11,7 @@ and code gets written several times faster.
 > **Free to use.** asasvirtuais is free for personal, learning and commercial projects. Commercial apps built with it
 > show **"Built with asasvirtuais"** linked to [asasvirtuais.com](https://asasvirtuais.com). Forks, rebrands, starter kits
 > and resold copies are not allowed, and gambling, betting and scam products are prohibited, no exceptions. Want to
-> drop the credit on a commercial app? [Talk to Asas Virtuais on LinkedIn](https://www.linkedin.com/company/asasvirtuaisdev).
+> drop the credit on a commercial app? [Talk to Asas Virtuais on LinkedIn](https://www.linkedin.com/company/asasvirtuaiscom).
 > Full terms in [LICENSE](./LICENSE).
 
 ---
@@ -408,4 +408,4 @@ error handling, and coding rules. Copy it into your app as `AGENTS.md`.
 
 [Asas Virtuais Attribution License 1.0](./LICENSE). Free to use. Commercial apps keep the "Built with asasvirtuais"
 credit. No forks or resale. Never for gambling, betting or scams. Everything else:
-[talk to us](https://www.linkedin.com/company/asasvirtuaisdev).
+[talk to us](https://www.linkedin.com/company/asasvirtuaiscom).
